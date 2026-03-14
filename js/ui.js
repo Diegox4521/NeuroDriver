@@ -1,0 +1,376 @@
+/**
+ * UI — manages HTML overlays, sensor toggle buttons, prediction prompts,
+ * confidence bar, experiment banners, sensor intro, ranking widget,
+ * and the reflection modal (including conditional Q4 ethics probe).
+ */
+
+const UI = (() => {
+
+  const $ = (sel) => document.querySelector(sel);
+  const phaseLabel        = () => $('#phaseLabel');
+  const timerEl           = () => $('#timer');
+  const confidenceContainer = () => $('#confidenceContainer');
+  const confBarInner      = () => $('#confidenceBarInner');
+  const confValue         = () => $('#confidenceValue');
+  const sensorTogglesDiv  = () => $('#sensorToggles');
+  const experimentBanner  = () => $('#experimentBanner');
+  const demoCountContainer = () => $('#demoCountContainer');
+  const demoCountEl       = () => $('#demoCount');
+  const overlay           = () => $('#overlay');
+  const overlayTitle      = () => $('#overlayTitle');
+  const overlayText       = () => $('#overlayText');
+  const overlayBtn        = () => $('#overlayBtn');
+  const predModal         = () => $('#predictionModal');
+  const predQuestion      = () => $('#predictionQuestion');
+  const predChoices       = () => $('#predictionChoices');
+  const reflModal         = () => $('#reflectionModal');
+  const instructionsEl    = () => $('#instructions');
+  const instructionText   = () => $('#instructionText');
+
+  let onToggleCallback = null;
+
+  // ── Sensor toggle buttons ──
+
+  function initToggleButtons(callback) {
+    onToggleCallback = callback;
+    document.querySelectorAll('.sensor-btn[data-modality]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('locked')) return;
+        const idx = parseInt(btn.dataset.modality, 10);
+        const isActive = btn.classList.contains('active');
+        const newState = !isActive;
+        if (onToggleCallback) onToggleCallback(idx, newState);
+      });
+    });
+  }
+
+  function applySensorBtnState(idx, active) {
+    const btn = document.querySelector(`.sensor-btn[data-modality="${idx}"]`);
+    if (!btn) return;
+    btn.classList.toggle('active', active);
+  }
+
+  function setTogglesDisabled(disabled) {
+    const div = sensorTogglesDiv();
+    if (!div) return;
+    div.classList.toggle('disabled', disabled);
+  }
+
+  function lockSensor(index) {
+    const btn = document.querySelector(`.sensor-btn[data-modality="${index}"]`);
+    if (!btn) return;
+    btn.classList.add('locked');
+    const desc = btn.querySelector('.sensor-desc');
+    if (desc) {
+      desc.setAttribute('data-original', desc.textContent);
+      desc.textContent = '\uD83D\uDD12 Unlocks in Round 2';
+    }
+  }
+
+  function unlockSensor(index) {
+    const btn = document.querySelector(`.sensor-btn[data-modality="${index}"]`);
+    if (!btn) return;
+    btn.classList.remove('locked');
+    const desc = btn.querySelector('.sensor-desc');
+    const original = desc ? desc.getAttribute('data-original') : null;
+    if (desc && original) desc.textContent = original;
+  }
+
+  // ── Confidence bar ──
+
+  function updateConfidence(value) {
+    const pct = Math.round(value * 100);
+    confBarInner().style.width = pct + '%';
+    confValue().textContent = pct + '%';
+    if (value > 0.7) confBarInner().style.background = '#22c55e';
+    else if (value > 0.4) confBarInner().style.background = '#f59e0b';
+    else confBarInner().style.background = '#ef4444';
+  }
+
+  // ── Experiment banner ──
+
+  function showBanner(text) {
+    experimentBanner().textContent = text;
+    experimentBanner().classList.remove('hidden');
+  }
+
+  function hideBanner() {
+    experimentBanner().classList.add('hidden');
+  }
+
+  // ── Phase overlay ──
+
+  function showOverlay(title, text, btnLabel) {
+    return new Promise(resolve => {
+      const elOverlay = overlay();
+      const elBtn = overlayBtn();
+      // #region agent log
+      fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966069'},body:JSON.stringify({sessionId:'966069',location:'ui.js:showOverlay',message:'showOverlay_called',data:{overlayExists:!!elOverlay,btnExists:!!elBtn,btnId:elBtn?elBtn.id:null},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      overlayTitle().textContent = title;
+      overlayText().textContent = text;
+      elBtn.textContent = btnLabel;
+      elOverlay.classList.remove('hidden');
+      elBtn.onclick = () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966069'},body:JSON.stringify({sessionId:'966069',location:'ui.js:overlayBtn.onclick',message:'overlay_btn_clicked',data:{},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        elOverlay.classList.add('hidden');
+        resolve();
+      };
+    });
+  }
+
+  function hideOverlay() { overlay().classList.add('hidden'); }
+
+  // ── Sensor introduction ──
+
+  function showSensorIntro() {
+    return new Promise(resolve => {
+      const modal = $('#sensorIntroModal');
+      const btn = $('#sensorIntroBtn');
+      const countdownEl = $('#sensorIntroCountdown');
+      modal.classList.remove('hidden');
+
+      let secondsLeft = 30;
+      countdownEl.textContent = `Auto-continues in ${secondsLeft}s`;
+
+      const interval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+          clearInterval(interval);
+          modal.classList.add('hidden');
+          resolve();
+        } else {
+          countdownEl.textContent = `Auto-continues in ${secondsLeft}s`;
+        }
+      }, 1000);
+
+      btn.onclick = () => {
+        clearInterval(interval);
+        modal.classList.add('hidden');
+        resolve();
+      };
+    });
+  }
+
+  // ── Ranking widget (click-to-rank) ──
+
+  function showRanking(titleText, subtitleText) {
+    return new Promise(resolve => {
+      const modal = $('#rankingModal');
+      const titleEl = $('#rankingTitle');
+      const subtitleEl = $('#rankingSubtitle');
+      const buttonsDiv = $('#rankingButtons');
+      const listDiv = $('#rankingList');
+      const resetBtn = $('#rankingReset');
+
+      titleEl.textContent = titleText;
+      subtitleEl.textContent = subtitleText;
+      buttonsDiv.innerHTML = '';
+      listDiv.innerHTML = '';
+      resetBtn.classList.add('hidden');
+
+      const sensorNames = Sensors.SENSOR_NAMES;  // 3 sensors: LiDAR, Camera, Speedometer
+      const ordinals = ['1st', '2nd', '3rd'];
+      const ranking = [];
+
+      function render() {
+        buttonsDiv.innerHTML = '';
+        listDiv.innerHTML = '';
+
+        sensorNames.forEach(name => {
+          if (ranking.includes(name)) return;
+          const btn = document.createElement('button');
+          btn.className = 'rank-btn';
+          btn.textContent = name;
+          btn.onclick = () => {
+            ranking.push(name);
+            render();
+            if (ranking.length === 3) {
+              setTimeout(() => {
+                modal.classList.add('hidden');
+                resolve([...ranking]);
+              }, 600);
+            }
+          };
+          buttonsDiv.appendChild(btn);
+        });
+
+        ranking.forEach((name, i) => {
+          const item = document.createElement('div');
+          item.className = 'rank-item';
+          item.textContent = `${ordinals[i]} \u2014 ${name}`;
+          listDiv.appendChild(item);
+        });
+
+        if (ranking.length > 0 && ranking.length < 3) {
+          resetBtn.classList.remove('hidden');
+        } else {
+          resetBtn.classList.add('hidden');
+        }
+      }
+
+      resetBtn.onclick = () => {
+        ranking.length = 0;
+        render();
+      };
+
+      modal.classList.remove('hidden');
+      render();
+    });
+  }
+
+  // ── Prediction prompt ──
+
+  const PREDICTION_OPTIONS = [
+    { id: 'fine',  label: 'Drive fine' },
+    { id: 'slow',  label: 'Wobble' },
+    { id: 'crash', label: 'Crash' },
+  ];
+
+  function showPrediction(sensorName, sensorIndex) {
+    return new Promise(resolve => {
+      predQuestion().textContent =
+        `If your AI can't use its ${sensorName}, it will:`;
+      predChoices().innerHTML = '';
+
+      PREDICTION_OPTIONS.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'pred-choice';
+        btn.textContent = opt.label;
+        btn.onclick = () => {
+          predModal().classList.add('hidden');
+          resolve(opt.id);
+        };
+        predChoices().appendChild(btn);
+      });
+      predModal().classList.remove('hidden');
+    });
+  }
+
+  // ── Reflection modal ──
+
+  function showReflection() {
+    return new Promise(resolve => {
+      reflModal().classList.remove('hidden');
+      const surprisedMostEl = $('#reflectSurprisedMost');
+      const surpriseRadios = document.querySelectorAll('input[name="reflectSurprise"]');
+      const explainSensorEl = $('#reflectExplainSensor');
+      const explainWhyEl = $('#reflectExplainWhy');
+      const msgEl = document.getElementById('reflectMessage');
+      const skipBtn = document.getElementById('reflectSkip');
+
+      if (msgEl) { msgEl.textContent = ''; msgEl.classList.add('hidden'); }
+      if (surprisedMostEl) surprisedMostEl.value = '';
+      if (explainSensorEl) explainSensorEl.value = '';
+      if (explainWhyEl) explainWhyEl.value = '';
+      surpriseRadios.forEach(r => { r.checked = false; });
+
+      function getSurpriseLevel() {
+        const checked = document.querySelector('input[name="reflectSurprise"]:checked');
+        return checked ? checked.value : null;
+      }
+
+      $('#reflectSubmit').onclick = () => {
+        const surprisedMostSensor = (surprisedMostEl && surprisedMostEl.value.trim()) || null;
+        const surpriseLevel = getSurpriseLevel();
+        const explainSensor = (explainSensorEl && explainSensorEl.value.trim()) || '';
+        const explainWhy = (explainWhyEl && explainWhyEl.value.trim()) || '';
+        const hasSurprisedMost = surprisedMostSensor && surprisedMostSensor !== '';
+        const hasSurpriseLevel = surpriseLevel != null;
+        const hasExplanation = explainSensor && explainWhy;
+        if (!hasSurprisedMost || !hasSurpriseLevel || !hasExplanation) {
+          if (msgEl) {
+            msgEl.textContent = 'Please answer all three questions or click Skip.';
+            msgEl.classList.remove('hidden');
+          }
+          return;
+        }
+        reflModal().classList.add('hidden');
+        resolve({
+          sensor: explainSensor,
+          reason: explainWhy,
+          skipped: false,
+          surprisedMostSensor: surprisedMostSensor || null,
+          surpriseLevel,
+        });
+      };
+
+      if (skipBtn) {
+        skipBtn.onclick = () => {
+          reflModal().classList.add('hidden');
+          resolve({
+            sensor: '',
+            reason: '',
+            skipped: true,
+            surprisedMostSensor: null,
+            surpriseLevel: null,
+          });
+        };
+      }
+    });
+  }
+
+  // ── Instructions toast ──
+
+  function showInstruction(text) {
+    instructionText().textContent = text;
+    instructionsEl().classList.remove('hidden');
+  }
+
+  function hideInstruction() {
+    instructionsEl().classList.add('hidden');
+  }
+
+  // ── Misc helpers ──
+
+  function setPhaseLabel(text)   { phaseLabel().textContent = text; }
+  function setTimer(text)        { timerEl().textContent = text; }
+  function showToggles()         { sensorTogglesDiv().classList.remove('hidden'); }
+  function hideToggles()         { sensorTogglesDiv().classList.add('hidden'); }
+  function showConfidence()      { confidenceContainer().classList.remove('hidden'); }
+  function hideConfidence()      { confidenceContainer().classList.add('hidden'); }
+
+  function setDemoCount(n, minRequired) {
+    const el = demoCountEl();
+    if (!el) return;
+    el.textContent = minRequired != null ? `${n} / ${minRequired}` : String(n);
+  }
+  function showDemoCount() {
+    const c = demoCountContainer();
+    if (c) c.classList.remove('hidden');
+  }
+  function hideDemoCount() {
+    const c = demoCountContainer();
+    if (c) c.classList.add('hidden');
+  }
+
+  return {
+    initToggleButtons,
+    applySensorBtnState,
+    updateConfidence,
+    showBanner,
+    hideBanner,
+    showOverlay,
+    hideOverlay,
+    showSensorIntro,
+    showRanking,
+    showPrediction,
+    showReflection,
+    showInstruction,
+    hideInstruction,
+    setPhaseLabel,
+    setTimer,
+    showToggles,
+    hideToggles,
+    showConfidence,
+    hideConfidence,
+    setDemoCount,
+    showDemoCount,
+    hideDemoCount,
+    setTogglesDisabled,
+    lockSensor,
+    unlockSensor,
+  };
+})();

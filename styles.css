@@ -1,0 +1,592 @@
+/* ── Base ── */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  position: relative;
+  width: 900px;
+  height: 700px;
+}
+
+canvas {
+  display: block;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+}
+
+.hidden { display: none !important; }
+
+/* ── HUD ── */
+
+#hud {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#hud > * { pointer-events: auto; }
+
+#phaseLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: right;
+}
+
+#timer {
+  font-size: 13px;
+  color: #64748b;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+/* ── Demo count ── */
+
+#demoCountContainer { text-align: right; }
+
+#demoCount {
+  font-size: 16px;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+/* ── Confidence ── */
+
+#confidenceContainer { text-align: right; }
+
+#confidenceBarOuter {
+  width: 140px;
+  height: 8px;
+  background: #334155;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 4px 0 2px auto;
+}
+
+#confidenceBarInner {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 4px;
+  transition: width 200ms ease, background 200ms ease;
+  width: 0%;
+}
+
+#confidenceValue {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ── Sensor toggles ── */
+
+#sensorToggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#sensorToggles.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.sensor-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 14px;
+  border: 2px solid #475569;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color 200ms, background 200ms, color 200ms, opacity 200ms;
+  min-width: 180px;
+}
+
+.sensor-btn.active {
+  border-color: #38bdf8;
+  color: #e2e8f0;
+  background: #1e3a5f;
+}
+
+.sensor-btn:hover:not(.locked) {
+  border-color: #60a5fa;
+}
+
+.sensor-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sensor-desc {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.sensor-btn.active .sensor-desc { color: #94a3b8; }
+
+/* Locked state */
+.sensor-btn.locked {
+  opacity: 0.4;
+  border-color: #334155;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.sensor-btn.locked .sensor-desc {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* ── Experiment banner ── */
+
+#experimentBanner {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293bdd;
+  color: #fbbf24;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 20;
+  text-align: center;
+  max-width: 520px;
+  border: 1px solid #475569;
+}
+
+/* ── Phase overlay ── */
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: #0f172aee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+#overlayContent {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 36px 48px;
+  text-align: center;
+  max-width: 480px;
+  pointer-events: auto;
+}
+
+#overlayContent h2 {
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: #f1f5f9;
+}
+
+#overlayContent p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin-bottom: 24px;
+}
+
+/* ── Buttons ── */
+
+.primary-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 150ms;
+}
+
+.primary-btn:hover { background: #3b82f6; }
+
+.secondary-btn {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms, color 150ms;
+}
+
+.secondary-btn:hover { color: #e2e8f0; border-color: #64748b; }
+
+/* ── Prediction modal ── */
+
+#predictionModal {
+  position: absolute;
+  inset: 0;
+  background: #0f172aee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 60;
+}
+
+#predictionContent {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 28px 36px;
+  max-width: 420px;
+  text-align: center;
+}
+
+#predictionContent h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+  color: #f1f5f9;
+}
+
+#predictionContent p {
+  font-size: 14px;
+  color: #cbd5e1;
+  margin-bottom: 18px;
+}
+
+.pred-choice {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 2px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms, background 150ms;
+}
+
+.pred-choice:hover {
+  border-color: #38bdf8;
+  background: #1e293b;
+}
+
+/* ── Reflection modal ── */
+
+#reflectionModal {
+  position: absolute;
+  inset: 0;
+  background: #0f172aee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 60;
+  overflow-y: auto;
+}
+
+#reflectionContent {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 28px 36px;
+  max-width: 480px;
+  width: 100%;
+}
+
+#reflectionContent h3 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  color: #f1f5f9;
+}
+
+.refl-q {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 14px 0 6px;
+}
+
+#reflectionContent select,
+#reflectionContent textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+#reflectionContent textarea { resize: vertical; }
+
+.refl-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.refl-scale label {
+  font-size: 13px;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.refl-scale input { margin-right: 6px; }
+
+.reflect-msg {
+  font-size: 12px;
+  color: #f59e0b;
+  margin-top: 8px;
+}
+
+.reflect-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+
+/* ── Instructions toast ── */
+
+#instructions {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293bdd;
+  border: 1px solid #475569;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #e2e8f0;
+  z-index: 10;
+  text-align: center;
+  max-width: 600px;
+}
+
+/* ── Sensor introduction modal ── */
+
+#sensorIntroModal {
+  position: absolute;
+  inset: 0;
+  background: #0f172aee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 55;
+}
+
+#sensorIntroContent {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 32px 40px;
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+}
+
+#sensorIntroContent h2 {
+  font-size: 22px;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+}
+
+.intro-subtitle {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-bottom: 24px;
+}
+
+.sensor-panels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.sensor-panel {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.sensor-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.sensor-panel-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #e2e8f0;
+}
+
+.sensor-panel-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.intro-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.countdown-text {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Ranking modal ── */
+
+#rankingModal {
+  position: absolute;
+  inset: 0;
+  background: #0f172aee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 55;
+}
+
+#rankingContent {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 32px 40px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+}
+
+#rankingContent h2 {
+  font-size: 18px;
+  color: #f1f5f9;
+  margin-bottom: 8px;
+}
+
+.ranking-instruction {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 20px;
+}
+
+.ranking-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.rank-btn {
+  padding: 12px 24px;
+  border: 2px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms, background 150ms;
+}
+
+.rank-btn:hover {
+  border-color: #38bdf8;
+  background: #1e293b;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.rank-item {
+  background: #1e3a5f;
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 300ms ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ranking-reset {
+  margin-top: 14px;
+}
+
+/* ── Thermal sensor button color ── */
+
+.sensor-btn[data-modality="2"].active {
+  border-color: #facc15;
+  background: #422006;
+}
+
+.sensor-btn[data-modality="2"]:hover:not(.locked) {
+  border-color: #fde047;
+}
+
+/* ── Q4 ethics section ── */
+
+#reflectQ4Section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+
+#reflectQ4Section .refl-q {
+  color: #fb923c;
+}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Driver — Glass Box</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%2322d3ee' width='32' height='32' rx='4'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="gameCanvas" width="900" height="700"></canvas>
+
+    <div id="hud">
+      <div id="phaseLabel">Phase 1: Teach the AI</div>
+      <div id="timer">Time: 0:00</div>
+
+      <div id="demoCountContainer" class="hidden">
+        <span class="hud-label">Samples</span>
+        <span id="demoCount">0</span>
+      </div>
+
+      <div id="confidenceContainer" class="hidden">
+        <span class="hud-label">AI Certainty</span>
+        <div id="confidenceBarOuter">
+          <div id="confidenceBarInner"></div>
+        </div>
+        <span id="confidenceValue">—</span>
+      </div>
+
+      <div id="sensorToggles" class="hidden">
+        <span class="hud-label">Sensors</span>
+        <button class="sensor-btn active" data-modality="0">
+          <span class="sensor-name">LiDAR</span>
+          <span class="sensor-desc">Fires lasers to measure distance to walls</span>
+        </button>
+        <button class="sensor-btn active" data-modality="1">
+          <span class="sensor-name">Camera</span>
+          <span class="sensor-desc">Reads lane position to stay centered</span>
+        </button>
+        <button class="sensor-btn active" data-modality="2">
+          <span class="sensor-name">Speedometer</span>
+          <span class="sensor-desc">Measures how fast the car is moving</span>
+        </button>
+      </div>
+
+      <div id="experimentBanner" class="hidden"></div>
+    </div>
+
+    <!-- Phase overlay -->
+    <div id="overlay" class="hidden">
+      <div id="overlayContent">
+        <h2 id="overlayTitle"></h2>
+        <p id="overlayText"></p>
+        <button id="overlayBtn" class="primary-btn">Start</button>
+      </div>
+    </div>
+
+    <!-- Sensor introduction modal -->
+    <div id="sensorIntroModal" class="hidden">
+      <div id="sensorIntroContent">
+        <h2>Your AI's Sensors</h2>
+        <p class="intro-subtitle">Your self-driving car uses three sensors to understand the road:</p>
+        <div class="sensor-panels">
+          <div class="sensor-panel">
+            <div class="sensor-icon">📡</div>
+            <div class="sensor-panel-name">LiDAR</div>
+            <div class="sensor-panel-desc">Fires lasers to measure distance to walls — like a Waymo car laser sensor</div>
+          </div>
+          <div class="sensor-panel">
+            <div class="sensor-icon">📷</div>
+            <div class="sensor-panel-name">Camera</div>
+            <div class="sensor-panel-desc">Reads lane position to stay centered — like Tesla lane-keeping assist</div>
+          </div>
+          <div class="sensor-panel">
+            <div class="sensor-icon">⏱️</div>
+            <div class="sensor-panel-name">Speedometer</div>
+            <div class="sensor-panel-desc">Measures how fast the car is moving — like your car's dashboard</div>
+          </div>
+        </div>
+        <div class="intro-footer">
+          <button id="sensorIntroBtn" class="primary-btn">Got it!</button>
+          <span id="sensorIntroCountdown" class="countdown-text"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ranking modal -->
+    <div id="rankingModal" class="hidden">
+      <div id="rankingContent">
+        <h2 id="rankingTitle"></h2>
+        <p id="rankingSubtitle" class="ranking-instruction"></p>
+        <div id="rankingButtons" class="ranking-buttons"></div>
+        <div id="rankingList" class="ranking-list"></div>
+        <button id="rankingReset" class="secondary-btn ranking-reset hidden">Reset</button>
+      </div>
+    </div>
+
+    <!-- Prediction modal -->
+    <div id="predictionModal" class="hidden">
+      <div id="predictionContent">
+        <h3>What will happen?</h3>
+        <p id="predictionQuestion"></p>
+        <div id="predictionChoices"></div>
+      </div>
+    </div>
+
+    <!-- Reflection modal -->
+    <div id="reflectionModal" class="hidden">
+      <div id="reflectionContent">
+        <h3>Reflection</h3>
+        <p class="refl-q">Which sensor surprised you most?</p>
+        <select id="reflectSurprisedMost">
+          <option value="">— Choose one —</option>
+          <option value="LiDAR">LiDAR</option>
+          <option value="Camera">Camera</option>
+          <option value="Speedometer">Speedometer</option>
+          <option value="None">None surprised me</option>
+        </select>
+        <p class="refl-q">How surprised were you?</p>
+        <div class="refl-scale">
+          <label><input type="radio" name="reflectSurprise" value="not"> Not surprised</label>
+          <label><input type="radio" name="reflectSurprise" value="a_little"> A little surprised</label>
+          <label><input type="radio" name="reflectSurprise" value="very"> Very surprised</label>
+        </div>
+        <p class="refl-q">Pick one sensor. What information does it give the AI, and what does the AI have to guess without it?</p>
+        <select id="reflectExplainSensor">
+          <option value="">— Choose a sensor —</option>
+          <option value="LiDAR">LiDAR</option>
+          <option value="Camera">Camera</option>
+          <option value="Speedometer">Speedometer</option>
+        </select>
+        <textarea id="reflectExplainWhy" rows="2" placeholder="What does this sensor tell the AI? What does the AI have to guess without it?"></textarea>
+        <p id="reflectMessage" class="reflect-msg hidden"></p>
+        <div class="reflect-buttons">
+          <button id="reflectSubmit" class="primary-btn">Submit</button>
+          <button id="reflectSkip" class="secondary-btn">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="instructions" class="hidden">
+      <span id="instructionText"></span>
+    </div>
+  </div>
+
+  <script src="js/track.js?v=4"></script>
+  <script src="js/car.js?v=4"></script>
+  <script src="js/sensors.js"></script>
+  <script src="js/knn.js"></script>
+  <script src="js/logger.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/gameManager.js?v=6"></script>
+  <script src="js/main.js?v=6"></script>
+</body>
+</html>
