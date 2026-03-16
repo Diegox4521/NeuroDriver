@@ -93,12 +93,13 @@ const Logger = (() => {
 
   function getLapCountForPhase(phase) { return lapCountsByPhase[phase] || 0; }
 
-  function logCrash(carState, toggleMask, phase) {
+  function logCrash(carState, toggleMask, phase, lapProgress) {
     crashes.push({
       t: t(),
       phase,
       x: +carState.x.toFixed(1),
       y: +carState.y.toFixed(1),
+      lapProgress: lapProgress != null ? +lapProgress.toFixed(4) : null,
       toggleMask: [...toggleMask],
     });
   }

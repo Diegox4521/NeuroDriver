@@ -13,6 +13,7 @@ const Track = (() => {
   const WALL_THICKNESS  = 4;
 
   // Control points: horizontal stadium oval with chicane on bottom straight (900×700 canvas).
+  // Full chicane geometry spec: docs/CHICANE_SPEC.md
   // Scaled 1.08× from center (450,350); shifted right so the track is centered and fully visible.
   const SCALE = 1.08;
   const CENTER_X = 450, CENTER_Y = 350;
@@ -25,11 +26,12 @@ const Track = (() => {
     { x: 130, y: 130 },  // 1  top-left curve apex (widened)
     { x: 140, y: 310 },  // 12 left curve apex (widened)
     { x: 150, y: 460 },  // 11 left curve lower (widened)
+    // Chicane (S-curve): baseline y=560, left kink +35px up, right kink +35px down
     { x: 190, y: 560 },  // 10 chicane exit
-    { x: 340, y: 570 },  // 9  chicane right kink apex (smoothed)
-    { x: 430, y: 555 },  // 8  chicane left kink apex (smoothed)
-    { x: 530, y: 570 },  // 7  chicane entry (shallower)
-    { x: 660, y: 560 },  // 6  bottom-right, chicane approach
+    { x: 310, y: 595 },  // 9  chicane right kink apex — 35px below baseline
+    { x: 430, y: 525 },  // 8  chicane left kink apex — 35px above baseline
+    { x: 550, y: 560 },  // 7  chicane entry
+    { x: 660, y: 560 },  // 6  chicane approach
   ];
   const CONTROL_POINTS = CONTROL_POINTS_RAW.map(p => ({
     x: CENTER_X + (p.x - CENTER_X) * SCALE + SHIFT_X,
