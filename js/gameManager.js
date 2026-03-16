@@ -60,7 +60,7 @@ const GameManager = (() => {
 
   let demoCenterDevSum = 0, demoCenterDevCount = 0, demoCrashCount = 0;
 
-  const CRASH_REPLAY_COUNT = 3;
+  const CRASH_REPLAY_COUNT = 15;  // oversample crashes so one demo crash has noticeable but not catastrophic effect (research justification: high-consequence events represented proportionally)
   let lastDemoSensors = null, lastDemoSteering = null;
   let demoRecordedDots = [];
 
@@ -260,7 +260,7 @@ const GameManager = (() => {
           }
         }
         if (outcomeWindowStart > 0) crashedDuringOutcomeWindow = true;
-        Logger.logCrash(stateForCrash, Sensors.getToggleMask(), currentPhase);
+        Logger.logCrash(stateForCrash, Sensors.getToggleMask(), currentPhase, Track.lapProgress(stateForCrash.x, stateForCrash.y));
         if (typeof window !== 'undefined' && (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION')) {
           window.__aiCrashed = true;
         }
