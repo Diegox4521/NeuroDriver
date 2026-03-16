@@ -307,7 +307,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = false;
+  const DEV_AUTO_DEMO = true;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -405,13 +405,22 @@ const GameManager = (() => {
 
     // Steering: MLP output → smooth → clamp. No manual overrides.
     const steer = Math.max(-1, Math.min(1, result.steering));
-    aiSmoothedSteering += (steer - aiSmoothedSteering) * STEER_SMOOTH;
+    const speedometerOff = !Sensors.getToggleMask()[2];
+    const steerSmooth    = speedometerOff ? (STEER_SMOOTH * 0.7) : STEER_SMOOTH;
+    aiSmoothedSteering += (steer - aiSmoothedSteering) * steerSmooth;
     aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);
 
-    // Throttle: use min of all raw rays so ablation doesn't confound speed.
+    // Throttle:
+    // - Normal: stay in the demo-speed regime (≈0.7–0.75).
+    // - Speedometer OFF: exceed the training regime so steering calibration breaks down.
     const lidarMin = Math.min(sensorsRaw[0], sensorsRaw[1], sensorsRaw[2], sensorsRaw[3], sensorsRaw[4]);
-    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
+    let throttle;
+    if (speedometerOff) {
+      throttle = 1.0;  // exceed training regime — same steering becomes too aggressive at corners
+    } else {
+      throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
+    }
     Car.setThrottle(throttle);
 
     UI.updateConfidence(result.confidence);
