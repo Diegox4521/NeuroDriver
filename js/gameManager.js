@@ -4,17 +4,17 @@
  *   INTRO -> PRACTICE -> SENSOR_INTRO -> HUMAN_DEMO -> PRE_ABLATION_RANKING
  *     -> AI_WARMUP [-> HUMAN_DEMO_EXTRA -> AI_WARMUP]*
  *     -> AI_ABLATION (single phase, all 3 toggles active from start)
- *     -> POST_ABLATION_RANKING -> REFLECTION -> DONE
+ *     -> POST_ABLATION_RANKING -> DONE
  */
 
 const GameManager = (() => {
 
   const PHASE_DURATIONS = {
-    PRACTICE:         (typeof window !== 'undefined' && window.DEV_SHORT_DEMOS) ? 5  : 20,
+    PRACTICE:         (typeof window !== 'undefined' && window.DEV_SHORT_DEMOS) ? 5  : 30,
     SENSOR_INTRO:     (typeof window !== 'undefined' && window.DEV_SHORT_DEMOS) ? 5  : 30,
     HUMAN_DEMO:       (typeof window !== 'undefined' && window.DEV_SHORT_DEMOS) ? 20 : 120,
     HUMAN_DEMO_EXTRA: (typeof window !== 'undefined' && window.DEV_SHORT_DEMOS) ? 10 : 30,
-    AI_WARMUP:        35,
+    AI_WARMUP:        45,
     AI_ABLATION:      180,
   };
 
@@ -215,7 +215,7 @@ const GameManager = (() => {
     Logger.setPostAblationRanking(ranking);
     Logger.logEvent('post_ablation_ranking', { ranking });
     paused = false;
-    beginReflection();
+    endSession();
   }
 
   async function beginReflection() {
