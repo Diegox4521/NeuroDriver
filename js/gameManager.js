@@ -33,6 +33,9 @@ const GameManager = (() => {
   let smoothedSteering   = 0;
   let aiSmoothedSteering = 0;
   const STEER_SMOOTH     = 0.18;
+  /** Lower than STEER_SMOOTH: MLP steering jumps frame-to-frame; extra low-pass keeps the car stable. */
+  const AI_STEER_SMOOTH        = 0.085;
+  const AI_STEER_SMOOTH_NO_SPD = 0.12; // ablation: a bit snappier than normal, not as harsh as 0.3
 
   const STEER_WINDOW_SIZE = 3;
   const steerWindow = new Array(STEER_WINDOW_SIZE).fill(0);
@@ -222,6 +225,7 @@ const GameManager = (() => {
     UI.setPhaseLabel('Phase 2: AI Driving');
     UI.hideDemoCount();
     UI.showConfidence();
+    aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
     paused = false;
@@ -256,6 +260,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 3: Sensor Experiments');
     UI.showToggles(); UI.showConfidence();
+    aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
     paused = false;
@@ -361,6 +366,7 @@ const GameManager = (() => {
         if (currentPhase === 'HUMAN_DEMO' || currentPhase === 'PRACTICE' || currentPhase === 'HUMAN_DEMO_EXTRA') {
           Car.respawn();
         } else {
+          if (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION') aiSmoothedSteering = 0;
           Car.respawn(aiRespawnPoseFromCrash(stateForCrash.x, stateForCrash.y));
         }
         lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
@@ -494,9 +500,8 @@ const GameManager = (() => {
     const resultRaw = KNN.predict(sensorsRaw);
     lastAIResult = result;
 
-    // Steering: MLP output → smooth → clamp. No manual overrides.
+    // Steering: MLP output → smooth → clamp. Full ±1 in chicanes the old ±0.8 cap caused understeer.
     const steer = Math.max(-1, Math.min(1, result.steering));
-    
     // Use the exact same steering physics as the human so the simulation is strictly fair.
     aiSmoothedSteering += (steer - aiSmoothedSteering) * STEER_SMOOTH;
     aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
