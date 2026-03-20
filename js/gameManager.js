@@ -33,6 +33,9 @@ const GameManager = (() => {
   let smoothedSteering   = 0;
   let aiSmoothedSteering = 0;
   const STEER_SMOOTH     = 0.18;
+  /** Lower than STEER_SMOOTH: MLP steering jumps frame-to-frame; extra low-pass keeps the car stable. */
+  const AI_STEER_SMOOTH        = 0.085;
+  const AI_STEER_SMOOTH_NO_SPD = 0.12; // ablation: a bit snappier than normal, not as harsh as 0.3
 
   const STEER_WINDOW_SIZE = 3;
   const steerWindow = new Array(STEER_WINDOW_SIZE).fill(0);
@@ -221,6 +224,7 @@ const GameManager = (() => {
     UI.setPhaseLabel('Phase 2: AI Driving');
     UI.hideDemoCount();
     UI.showConfidence();
+    aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
     paused = false;
@@ -255,6 +259,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 3: Sensor Experiments');
     UI.showToggles(); UI.showConfidence();
+    aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
     paused = false;
@@ -360,6 +365,7 @@ const GameManager = (() => {
         if (currentPhase === 'HUMAN_DEMO' || currentPhase === 'PRACTICE' || currentPhase === 'HUMAN_DEMO_EXTRA') {
           Car.respawn();
         } else {
+          if (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION') aiSmoothedSteering = 0;
           Car.respawn(aiRespawnPoseFromCrash(stateForCrash.x, stateForCrash.y));
         }
         lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
@@ -493,21 +499,34 @@ const GameManager = (() => {
     const resultRaw = KNN.predict(sensorsRaw);
     lastAIResult = result;
 
-    // Steering: MLP output → smooth → clamp. No manual overrides.
+    // Steering: MLP output → smooth → clamp. Full ±1 in chicanes the old ±0.8 cap caused understeer.
     const steer = Math.max(-1, Math.min(1, result.steering));
     const speedometerOff = !Sensors.getToggleMask()[2];
-    
-    // Normal AI needs a low smoothing (0.1) to filter out its natural jitter.
-    // If Speed is OFF, we make it highly reactive (0.3) so the natural jitters crash it.
-    const steerSmooth    = speedometerOff ? 0.3 : 0.1;
+    let steerSmooth = speedometerOff ? AI_STEER_SMOOTH_NO_SPD : AI_STEER_SMOOTH;
+
+    const lf = sensorsRaw[0], ln = sensorsRaw[1], fw = sensorsRaw[2], rn = sensorsRaw[3], rf = sensorsRaw[4];
+    const lidarMin = Math.min(lf, ln, fw, rn, rf);
+    const sideMin = Math.min(ln, rn); // lateral clearance — drops in chicanes before forward does
+
+    // Tight S-curves: default smoothing lags behind required steer; follow the net faster here.
+    const tightAhead = fw < 0.52;
+    const tightSides = sideMin < 0.5;
+    if (tightAhead || tightSides) {
+      const urgency = (tightAhead ? 1 : 0) + (tightSides ? 0.75 : 0);
+      steerSmooth = Math.min(0.26, steerSmooth * (1 + urgency * 1.2));
+    }
+
     aiSmoothedSteering += (steer - aiSmoothedSteering) * steerSmooth;
-    aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
+    aiSmoothedSteering = Math.max(-1, Math.min(1, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);
 
-    // Throttle:
-    // - Normal: stay in the demo-speed regime (≈0.7–0.75).
-    const lidarMin = Math.min(sensorsRaw[0], sensorsRaw[1], sensorsRaw[2], sensorsRaw[3], sensorsRaw[4]);
-    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
+    // Throttle: slower in narrow chicane so yaw rate (scales with speed in Car) can keep up.
+    let throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35)
+      ? (lidarMin < 0.45 ? 0.68 : 0.72)
+      : 0.62;
+    if (sideMin < 0.42 || fw < 0.48) {
+      throttle = Math.min(throttle, sideMin < 0.36 ? 0.5 : 0.56);
+    }
     Car.setThrottle(throttle);
 
     UI.updateConfidence(result.confidence);
