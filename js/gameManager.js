@@ -51,12 +51,13 @@ const GameManager = (() => {
 
   let spaceWasDown = false;
 
-  const OUTCOME_WINDOW_MS              = 4500;
+  const OUTCOME_WINDOW_MS              = 7000;
   const DEGRADED_THRESHOLD_CENTER_DEV  = 0.75;
   const MIN_DEMO_COUNT                 = 100;
   let outcomeWindowStart               = 0;
   let outcomeWindowMaxAbsDeviation     = 0;
   let crashedDuringOutcomeWindow       = false;
+  let outcomeResolver                  = null;
 
   let demoCenterDevSum = 0, demoCenterDevCount = 0, demoCrashCount = 0;
 
@@ -66,6 +67,40 @@ const GameManager = (() => {
 
   const MAX_WARMUP_RETRIES = 2;
   let warmupRetryCount = 0;
+
+  /** Same crash region on the loop (handles wrap near 0/1). */
+  const SAME_SPOT_LAP_PROGRESS = 0.05;
+  let consecutiveCrashCount = 0;
+  let lastCrashLapProgress = -1;
+
+  function lapProgressDistance(a, b) {
+    const d = Math.abs(a - b);
+    return Math.min(d, 1 - d);
+  }
+
+  function offSensorNamesLabel(toggleMask) {
+    const names = [];
+    for (let i = 0; i < toggleMask.length; i++) {
+      if (!toggleMask[i]) names.push(Sensors.SENSOR_NAMES[i]);
+    }
+    return names.length ? names.join(' + ') : 'sensors';
+  }
+
+  function aiRespawnPoseFromCrash(crashX, crashY) {
+    const stepsBack = consecutiveCrashCount >= 3 ? 60 : 25;
+    const centerline = Track.centerline();
+    const n = centerline.length;
+    const infoIndex = Track.nearestCenterlineIndex(crashX, crashY);
+    const idx = (infoIndex - stepsBack + n) % n;
+    const p = centerline[idx];
+    const next = centerline[(idx + 1) % n];
+    return { x: p.x, y: p.y, angle: Math.atan2(next.y - p.y, next.x - p.x) };
+  }
+
+  function resetCrashStreak() {
+    consecutiveCrashCount = 0;
+    lastCrashLapProgress = -1;
+  }
 
   // ── Phase transitions ──────────────────────────────────────────────────────
 
@@ -152,6 +187,7 @@ const GameManager = (() => {
 
   async function beginAIWarmup() {
     paused = true;
+    resetCrashStreak();
     // Batch-train after all demos collected. Prevents catastrophic forgetting
     // that happens when samples arrive in sequential track order.
     KNN.train();
@@ -172,6 +208,7 @@ const GameManager = (() => {
   }
 
   function beginHumanDemoExtra() {
+    resetCrashStreak();
     currentPhase = 'HUMAN_DEMO_EXTRA';
     Logger.logPhase('HUMAN_DEMO_EXTRA');
     phaseStartTime = performance.now();
@@ -186,6 +223,7 @@ const GameManager = (() => {
 
   async function beginAblation() {
     paused = true;
+    resetCrashStreak();
     Sensors.resetToggles();
     await UI.showOverlay(
       'Experiment Time',
@@ -260,7 +298,30 @@ const GameManager = (() => {
           }
         }
         if (outcomeWindowStart > 0) crashedDuringOutcomeWindow = true;
-        Logger.logCrash(stateForCrash, Sensors.getToggleMask(), currentPhase, Track.lapProgress(stateForCrash.x, stateForCrash.y));
+        const currentProgress = Track.lapProgress(stateForCrash.x, stateForCrash.y);
+        const sameSpot = lastCrashLapProgress >= 0 &&
+          lapProgressDistance(currentProgress, lastCrashLapProgress) < SAME_SPOT_LAP_PROGRESS;
+        if (sameSpot) {
+          consecutiveCrashCount++;
+        } else {
+          consecutiveCrashCount = 1;
+        }
+        lastCrashLapProgress = currentProgress;
+        const mask = Sensors.getToggleMask();
+        Logger.logCrash(stateForCrash, mask, currentPhase, currentProgress, consecutiveCrashCount);
+        if (consecutiveCrashCount === 3 && (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION')) {
+          const offLabel = offSensorNamesLabel(mask);
+          const restoreWord = offLabel.includes('+') ? 'them' : 'it';
+          UI.showBanner(
+            `The AI keeps crashing with ${offLabel} OFF — try restoring ${restoreWord} or experiment with a different sensor.`
+          );
+          Logger.logEvent('crash_loop_nudge', {
+            consecutiveCrashes: consecutiveCrashCount,
+            lapProgress: +currentProgress.toFixed(4),
+            toggleMask: [...mask],
+            phase: currentPhase,
+          });
+        }
         if (typeof window !== 'undefined' && (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION')) {
           window.__aiCrashed = true;
         }
@@ -270,7 +331,7 @@ const GameManager = (() => {
         if (currentPhase === 'HUMAN_DEMO' || currentPhase === 'PRACTICE' || currentPhase === 'HUMAN_DEMO_EXTRA') {
           Car.respawn();
         } else {
-          Car.respawn(Track.nearestSafePose(stateForCrash.x, stateForCrash.y));
+          Car.respawn(aiRespawnPoseFromCrash(stateForCrash.x, stateForCrash.y));
         }
         lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
         crashTimer = 0; crashLogged = false;
@@ -307,7 +368,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = true;
+  const DEV_AUTO_DEMO = false;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -427,7 +488,14 @@ const GameManager = (() => {
 
     if (outcomeWindowStart > 0 && (now - outcomeWindowStart) < OUTCOME_WINDOW_MS) {
       const dev = Track.centerDeviation(carState.x, carState.y);
-      outcomeWindowMaxAbsDeviation = Math.max(outcomeWindowMaxAbsDeviation, Math.abs(dev));
+      const absDev = Math.abs(dev);
+      outcomeWindowMaxAbsDeviation = Math.max(outcomeWindowMaxAbsDeviation, absDev);
+
+      // If a decisive degradation happens during the window and a resolver exists,
+      // finalize the outcome early instead of waiting for the timeout.
+      if (outcomeResolver && (carState.crashed || absDev > DEGRADED_THRESHOLD_CENTER_DEV)) {
+        outcomeResolver();
+      }
     }
 
     if (now - lastLogTime > LOG_INTERVAL) {
@@ -487,6 +555,7 @@ const GameManager = (() => {
 
   async function handleToggle(sensorIndex, newState) {
     if (paused || currentPhase !== 'AI_ABLATION') return;
+    resetCrashStreak();
     paused = true;
 
     const sensorName = Sensors.SENSOR_NAMES[sensorIndex];
@@ -518,7 +587,12 @@ const GameManager = (() => {
       outcomeWindowStart = performance.now();
       outcomeWindowMaxAbsDeviation = 0;
       crashedDuringOutcomeWindow = false;
-      setTimeout(() => {
+
+      let outcomeResolved = false;
+      outcomeResolver = () => {
+        if (outcomeResolved) return;
+        outcomeResolved = true;
+
         const stateNow  = Car.getState();
         let outcome;
         if (stateNow.crashed || crashedDuringOutcomeWindow) {
@@ -531,11 +605,18 @@ const GameManager = (() => {
         const confAtOutcome = KNN.predict(Sensors.compute(stateNow)).confidence;
         outcomeWindowStart = 0;
         crashedDuringOutcomeWindow = false;
+        outcomeResolver = null;
         Logger.logToggle(sensorIndex, sensorName, newState, predictionChoice, outcome, confBefore, confAtOutcome, lapProg, OUTCOME_WINDOW_MS, null);
         UI.showConfidence();
         const match = predictionChoice === outcome;
         UI.showBanner(`You predicted: ${OUTCOME_LABELS[predictionChoice]}. Result: ${OUTCOME_LABELS[outcome]}. ${match ? '✓ Correct!' : '✗ Different than expected.'}`);
         setTimeout(() => { UI.hideBanner(); UI.setTogglesDisabled(false); }, OUTCOME_FEEDBACK_MS);
+      };
+
+      setTimeout(() => {
+        if (outcomeResolver) {
+          outcomeResolver();
+        }
       }, OUTCOME_WINDOW_MS);
     } else {
       UI.setTogglesDisabled(false);
@@ -543,5 +624,12 @@ const GameManager = (() => {
     }
   }
 
-  return { start, update, draw, handleToggle, getPhase: () => currentPhase };
+  return {
+    start,
+    update,
+    draw,
+    handleToggle,
+    getPhase: () => currentPhase,
+    isPaused: () => paused,
+  };
 })();

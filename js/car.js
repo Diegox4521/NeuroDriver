@@ -70,6 +70,11 @@ const Car = (() => {
   function update(dt) {
     if (crashed) return;
 
+    // Pause car movement when the GameManager is paused (e.g., during prediction prompts).
+    if (typeof GameManager !== 'undefined' && GameManager.isPaused && GameManager.isPaused()) {
+      return;
+    }
+
     // Throttle / friction
     const t = Math.max(0, Math.min(1, throttle));
     if (t > 0) speed = Math.min(MAX_SPEED, speed + ACCEL * t);
