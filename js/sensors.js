@@ -124,35 +124,81 @@ const Sensors = (() => {
   // ── Drawing ──────────────────────────────────────────────────────────────
 
   function draw(ctx) {
-    const lidarActive = toggleMask[0];
+    if (lastRays.length === 0) return;
+
+    const lidarActive  = toggleMask[0];
+    const cameraActive = toggleMask[1];
+    const speedActive  = toggleMask[2];
+    const rForward     = lastRays[2]; // the 0-degree ray
+    const carX = rForward.ox;
+    const carY = rForward.oy;
+
+    // --- Camera Overlay (Vision Cone) ---
+    if (cameraActive) {
+      ctx.save();
+      const dist = rForward.dist;
+      const angle = Math.atan2(rForward.hy - rForward.oy, rForward.hx - rForward.ox);
+      const coneAngle = Math.PI / 6; // 30 degrees half-angle
+      
+      ctx.beginPath();
+      ctx.moveTo(carX, carY);
+      ctx.arc(carX, carY, dist, angle - coneAngle, angle + coneAngle);
+      ctx.lineTo(carX, carY);
+      
+      const grad = ctx.createRadialGradient(carX, carY, 0, carX, carY, dist);
+      grad.addColorStop(0, 'rgba(52, 211, 153, 0.25)'); // #34d399
+      grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
+      
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // --- LiDAR Rays ---
+    ctx.save();
+    if (lidarActive) ctx.globalCompositeOperation = 'screen';
+    
     for (let i = 0; i < lastRays.length; i++) {
       const r = lastRays[i];
       ctx.beginPath();
       ctx.moveTo(r.ox, r.oy);
       ctx.lineTo(r.hx, r.hy);
+      
       if (lidarActive) {
-        ctx.strokeStyle = (r.dist / RAY_MAX_DIST) > 0.5 ? '#22d3ee' : '#ef4444';
-        ctx.globalAlpha = 0.7;
+        const isSafe = (r.dist / RAY_MAX_DIST) > 0.5;
+        ctx.strokeStyle = isSafe ? '#22d3ee' : '#ef4444';
         ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw hit point dot
+        ctx.beginPath();
+        ctx.arc(r.hx, r.hy, 3, 0, Math.PI * 2);
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
       } else {
         ctx.strokeStyle = '#444';
         ctx.globalAlpha = 0.2;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
     }
+    ctx.restore();
 
-    if (lastRays.length > 0) {
-      const r0 = lastRays[0];
+    // --- Speedometer Text ---
+    if (speedActive) {
+      // Access the normalized speed from the last MLP vector (index 5)
+      // or directly from lastValues array (index 2 corresponds to speed value)
+      const speedVal = lastValues[2]; 
+      const mph = Math.round(speedVal * 120); // arbitrary max MPH mapping
       ctx.save();
-      ctx.font = '10px sans-serif';
-      ctx.fillStyle = '#22d3ee';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText('LiDAR', r0.ox + 4, r0.oy - 4);
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.fillStyle = '#facc15';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(mph + ' MPH', carX, carY + 16);
       ctx.restore();
     }
   }

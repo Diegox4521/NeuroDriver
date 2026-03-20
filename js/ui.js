@@ -26,8 +26,63 @@ const UI = (() => {
   const reflModal         = () => $('#reflectionModal');
   const instructionsEl    = () => $('#instructions');
   const instructionText   = () => $('#instructionText');
+  const miniHud           = () => $('#miniHud');
+  const miniHudContent    = () => $('#miniHudContent');
+  const controlsHud       = () => $('#controlsHud');
 
   let onToggleCallback = null;
+
+  // ── Draggable Utility ──
+  function makeDraggable(el) {
+    if (!el) return;
+    let isDragging = false, startX, startY, origX, origY;
+    
+    el.style.cursor = 'grab';
+    el.style.pointerEvents = 'auto'; // ensure it can be grabbed
+
+    el.addEventListener('mousedown', e => {
+      // Don't drag if clicking a button/input inside
+      if (e.target.closest('button') || ['INPUT', 'SELECT'].includes(e.target.tagName)) return;
+      isDragging = true;
+      el.style.cursor = 'grabbing';
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = el.getBoundingClientRect();
+      origX = rect.left;
+      origY = rect.top;
+      
+      // Detach from responsive anchors (left/right/translate) so dragging follows absolute cursor
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.left = origX + 'px';
+      el.style.top = origY + 'px';
+      el.style.transform = 'none'; 
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      el.style.left = (origX + dx) + 'px';
+      el.style.top = (origY + dy) + 'px';
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        el.style.cursor = 'grab';
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    makeDraggable($('#hud'));
+    makeDraggable($('#miniHud'));
+    makeDraggable($('#controlsHud'));
+    makeDraggable($('#experimentBanner'));
+    makeDraggable($('#instructions'));
+  });
 
   // ── Sensor toggle buttons ──
 
@@ -122,6 +177,49 @@ const UI = (() => {
   }
 
   function hideOverlay() { overlay().classList.add('hidden'); }
+
+  // ── Login ──
+
+  function showLogin() {
+    return new Promise(resolve => {
+      const modal = $('#loginModal');
+      const firstInput = $('#loginFirstName');
+      const initialInput = $('#loginLastInitial');
+      const errorMsg = $('#loginError');
+      const btn = $('#loginBtn');
+      
+      modal.classList.remove('hidden');
+      errorMsg.style.display = 'none';
+      firstInput.focus();
+
+      function submit() {
+        const firstName = firstInput.value.trim();
+        let lastInitial = initialInput.value.trim().toUpperCase();
+        
+        if (!firstName) {
+          errorMsg.style.display = 'block';
+          firstInput.focus();
+          return;
+        }
+        if (!lastInitial) {
+          errorMsg.style.display = 'block';
+          initialInput.focus();
+          return;
+        }
+
+        // Clean up last initial (remove extra characters, add period)
+        if (lastInitial.length > 1) lastInitial = lastInitial[0];
+        const formattedName = `${firstName} ${lastInitial}.`;
+
+        modal.classList.add('hidden');
+        resolve(formattedName);
+      }
+
+      btn.onclick = submit;
+      firstInput.onkeydown = (e) => { if (e.key === 'Enter') initialInput.focus(); };
+      initialInput.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+    });
+  }
 
   // ── Sensor introduction ──
 
@@ -352,6 +450,7 @@ const UI = (() => {
     updateConfidence,
     showBanner,
     hideBanner,
+    showLogin,
     showOverlay,
     hideOverlay,
     showSensorIntro,
@@ -369,8 +468,26 @@ const UI = (() => {
     setDemoCount,
     showDemoCount,
     hideDemoCount,
+    showControls: () => controlsHud() && controlsHud().classList.remove('hidden'),
+    hideControls: () => controlsHud() && controlsHud().classList.add('hidden'),
     setTogglesDisabled,
     lockSensor,
     unlockSensor,
+    updateMiniHUD: (vals, mask) => {
+      if (!miniHudContent()) return;
+      miniHud().classList.remove('hidden');
+      const names  = ['LiDAR', 'Camera', 'Speed'];
+      const colors = ['#22d3ee', '#34d399', '#facc15'];
+      let html = '';
+      for (let i = 0; i < 3; i++) {
+        const val = mask[i] ? vals[i].toFixed(2) : 'OFF';
+        const color = mask[i] ? colors[i] : '#555';
+        html += `<div class="mini-hud-row">
+                   <span class="mini-hud-label">${names[i]}</span>
+                   <span class="mini-hud-val" style="color: ${color}">${val}</span>
+                 </div>`;
+      }
+      miniHudContent().innerHTML = html;
+    }
   };
 })();

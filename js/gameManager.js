@@ -104,7 +104,23 @@ const GameManager = (() => {
 
   // ── Phase transitions ──────────────────────────────────────────────────────
 
+  let currentPlayer = 'Guest';
+
   async function start() {
+    currentPhase = 'LOGIN';
+    if (typeof window !== 'undefined') { window.__phase = currentPhase; window.__aiCrashed = false; }
+    
+    currentPlayer = await UI.showLogin();
+    
+    const progressKey = 'neuroDriver_progress_' + currentPlayer;
+    if (!localStorage.getItem(progressKey)) {
+        localStorage.setItem(progressKey, JSON.stringify({
+            laps: 0,
+            highestDemoScore: 0,
+            phasesCompleted: []
+        }));
+    }
+
     Logger.start();
     Logger.setConfig({
       sensorCount: 3,
@@ -116,7 +132,8 @@ const GameManager = (() => {
       crashRespawnDelayMs: CRASH_RESPAWN_DELAY,
       maxWarmupRetries: MAX_WARMUP_RETRIES,
     });
-    if (typeof window !== 'undefined') { window.__phase = currentPhase; window.__aiCrashed = false; }
+    
+    if (typeof UI.showControls === 'function') UI.showControls();
     await showIntro();
   }
 
@@ -188,6 +205,8 @@ const GameManager = (() => {
   async function beginAIWarmup() {
     paused = true;
     resetCrashStreak();
+    Sensors.resetToggles();
+    for (let i = 0; i < 3; i++) UI.applySensorBtnState(i, true);
     // Batch-train after all demos collected. Prevents catastrophic forgetting
     // that happens when samples arrive in sequential track order.
     KNN.train();
@@ -225,6 +244,7 @@ const GameManager = (() => {
     paused = true;
     resetCrashStreak();
     Sensors.resetToggles();
+    for (let i = 0; i < 3; i++) UI.applySensorBtnState(i, true);
     await UI.showOverlay(
       'Experiment Time',
       'The AI uses 3 sensors: LiDAR, Camera, and Speedometer. Try turning sensors off to see what happens!',
@@ -277,7 +297,7 @@ const GameManager = (() => {
   // ── Per-frame update ───────────────────────────────────────────────────────
 
   function update(dt, now) {
-    if (paused || currentPhase === 'INTRO' || currentPhase === 'DONE') return;
+    if (paused || currentPhase === 'LOGIN' || currentPhase === 'INTRO' || currentPhase === 'DONE') return;
     if (typeof window !== 'undefined') window.__phase = currentPhase;
 
     phaseElapsed = now - phaseStartTime;
@@ -313,11 +333,17 @@ const GameManager = (() => {
         const mask = Sensors.getToggleMask();
         Logger.logCrash(stateForCrash, mask, currentPhase, currentProgress, consecutiveCrashCount);
         if (consecutiveCrashCount === 3 && (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION')) {
-          const offLabel = offSensorNamesLabel(mask);
-          const restoreWord = offLabel.includes('+') ? 'them' : 'it';
-          UI.showBanner(
-            `The AI keeps crashing with ${offLabel} OFF — try restoring ${restoreWord} or experiment with a different sensor.`
-          );
+          const anyOff = mask.includes(false);
+          if (anyOff) {
+            const offLabel = offSensorNamesLabel(mask);
+            const restoreWord = offLabel.includes('+') ? 'them' : 'it';
+            UI.showBanner(
+              `The AI keeps crashing with ${offLabel} OFF — try restoring ${restoreWord} or experiment with a different sensor.`
+            );
+          } else {
+            UI.showBanner(`The AI is struggling to drive! It might need more practice data.`);
+          }
+          setTimeout(() => UI.hideBanner(), 4000);
           Logger.logEvent('crash_loop_nudge', {
             consecutiveCrashes: consecutiveCrashCount,
             lapProgress: +currentProgress.toFixed(4),
@@ -470,21 +496,18 @@ const GameManager = (() => {
     // Steering: MLP output → smooth → clamp. No manual overrides.
     const steer = Math.max(-1, Math.min(1, result.steering));
     const speedometerOff = !Sensors.getToggleMask()[2];
-    const steerSmooth    = speedometerOff ? (STEER_SMOOTH * 0.7) : STEER_SMOOTH;
+    
+    // Normal AI needs a low smoothing (0.1) to filter out its natural jitter.
+    // If Speed is OFF, we make it highly reactive (0.3) so the natural jitters crash it.
+    const steerSmooth    = speedometerOff ? 0.3 : 0.1;
     aiSmoothedSteering += (steer - aiSmoothedSteering) * steerSmooth;
     aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);
 
     // Throttle:
     // - Normal: stay in the demo-speed regime (≈0.7–0.75).
-    // - Speedometer OFF: exceed the training regime so steering calibration breaks down.
     const lidarMin = Math.min(sensorsRaw[0], sensorsRaw[1], sensorsRaw[2], sensorsRaw[3], sensorsRaw[4]);
-    let throttle;
-    if (speedometerOff) {
-      throttle = 1.0;  // exceed training regime — same steering becomes too aggressive at corners
-    } else {
-      throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
-    }
+    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
     Car.setThrottle(throttle);
 
     UI.updateConfidence(result.confidence);

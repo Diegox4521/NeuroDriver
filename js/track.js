@@ -216,32 +216,47 @@ const Track = (() => {
       ctx.lineTo(outerWall[i].x1, outerWall[i].y1);
     }
     ctx.closePath();
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = '#334155'; // Asphalt
     ctx.fill();
 
-    // Centerline dashes
-    ctx.setLineDash([10, 14]);
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
+    // Double Yellow Centerline
+    ctx.setLineDash([16, 20]);
+    ctx.strokeStyle = '#eab308';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    centerline.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.closePath();
+    centerline.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Inner wall
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = WALL_THICKNESS;
+    // Draw Curbs (Outer / Inner walls)
+    // Inner wall base (white)
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = WALL_THICKNESS + 2;
     ctx.beginPath();
     innerWall.forEach((s, i) => (i === 0 ? ctx.moveTo(s.x1, s.y1) : ctx.lineTo(s.x1, s.y1)));
-    ctx.closePath();
     ctx.stroke();
+    
+    // Inner wall dash (red)
+    ctx.setLineDash([12, 12]);
+    ctx.strokeStyle = '#ef4444';
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-    // Outer wall
+    // Outer wall base (white)
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = WALL_THICKNESS + 2;
     ctx.beginPath();
     outerWall.forEach((s, i) => (i === 0 ? ctx.moveTo(s.x1, s.y1) : ctx.lineTo(s.x1, s.y1)));
-    ctx.closePath();
     ctx.stroke();
+    
+    // Outer wall dash (red)
+    ctx.setLineDash([12, 12]);
+    ctx.strokeStyle = '#ef4444';
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   return {

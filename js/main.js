@@ -6,6 +6,13 @@
   const canvas = document.getElementById('gameCanvas');
   const ctx    = canvas.getContext('2d');
 
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
   Track.init();
   Car.reset(Track.startPose());
 
@@ -21,37 +28,29 @@
 
     GameManager.update(dt, now);
     Car.update(dt);
-    Sensors.compute(Car.getState());
+    
+    const carState = Car.getState();
+    Sensors.compute(carState);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    // Keep track statically centered on the screen (track was originally built for 900x700)
+    ctx.translate(canvas.width / 2 - 450, canvas.height / 2 - 350);
+
     Track.draw(ctx);
     Sensors.draw(ctx);
     GameManager.draw(ctx);
     Car.draw(ctx);
-    drawMiniHUD(ctx);
+    
+    ctx.restore();
 
-    requestAnimationFrame(loop);
-  }
-
-  function drawMiniHUD(ctx) {
-    const vals   = Sensors.getLastValues();
-    const names  = Sensors.SENSOR_NAMES;
-    const colors = Sensors.SENSOR_COLORS;
-    const mask   = Sensors.getToggleMask();
-
-    ctx.save();
-    ctx.fillStyle = '#16213ecc';
-    ctx.fillRect(10, 10, 170, 80);
-    ctx.font = '11px monospace';
-
-    for (let i = 0; i < 3; i++) {
-      const label = names[i].padEnd(14);
-      const val   = mask[i] ? vals[i].toFixed(2) : ' OFF';
-      ctx.fillStyle = mask[i] ? colors[i] : '#555';
-      ctx.fillText(`${label} ${val}`, 18, 30 + i * 20);
+    // Update DOM Mini HUD
+    if (typeof UI.updateMiniHUD === 'function') {
+      UI.updateMiniHUD(Sensors.getLastValues(), Sensors.getToggleMask());
     }
 
-    ctx.restore();
+    requestAnimationFrame(loop);
   }
 
   const params = new URLSearchParams(window.location.search);

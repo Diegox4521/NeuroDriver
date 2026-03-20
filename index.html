@@ -9,7 +9,7 @@
 </head>
 <body>
   <div id="app">
-    <canvas id="gameCanvas" width="900" height="700"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <div id="hud">
       <div id="phaseLabel">Phase 1: Teach the AI</div>
@@ -43,8 +43,24 @@
           <span class="sensor-desc">Measures how fast the car is moving</span>
         </button>
       </div>
+    </div>
 
-      <div id="experimentBanner" class="hidden"></div>
+    <div id="experimentBanner" class="hidden"></div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="hidden">
+      <div id="loginContent">
+        <h2>NEURO DRIVER</h2>
+        <p style="color: #fbbf24; font-weight: bold; font-size: 16px; margin-bottom: 6px;">WELCOME TO THE SIMULATION</p>
+        <p style="margin-bottom: 24px; line-height: 1.5;"><strong>How to play:</strong> Use the Arrow Keys to drive. Avoid the walls, keep your speed up, and teach the AI to mimic your perfect laps!</p>
+        <p style="font-size: 13px; color: #94a3b8; font-style: italic; margin-bottom: 12px;">Enter your First Name and Last Initial to track your progress.</p>
+        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 24px;">
+          <input type="text" id="loginFirstName" placeholder="First Name" maxlength="20" autocomplete="off" style="flex: 2;" />
+          <input type="text" id="loginLastInitial" placeholder="Last Initial" maxlength="2" autocomplete="off" style="flex: 1; text-align: center;" />
+        </div>
+        <p id="loginError" style="color: #ef4444; font-size: 13px; margin-bottom: 12px; display: none;">Please provide both a First Name and Last Initial!</p>
+        <button id="loginBtn" class="primary-btn">Start Engine</button>
+      </div>
     </div>
 
     <!-- Phase overlay -->
@@ -141,6 +157,28 @@
 
     <div id="instructions" class="hidden">
       <span id="instructionText"></span>
+    </div>
+
+    <!-- Mini HUD -->
+    <div id="miniHud" class="hidden">
+      <div id="miniHudContent"></div>
+    </div>
+
+    <!-- Controls HUD -->
+    <div id="controlsHud" class="hidden">
+      <div class="hud-label">CONTROLS</div>
+      <div class="mini-hud-row">
+        <span class="mini-hud-label">[ &uarr; ]</span>
+        <span class="mini-hud-val">Accelerate</span>
+      </div>
+      <div class="mini-hud-row">
+        <span class="mini-hud-label">[ &larr; &rarr; ]</span>
+        <span class="mini-hud-val">Steer</span>
+      </div>
+      <div class="mini-hud-row">
+        <span class="mini-hud-label">[ SPACE ]</span>
+        <span class="mini-hud-val">Next</span>
+      </div>
     </div>
   </div>
 
