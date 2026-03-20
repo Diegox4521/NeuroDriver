@@ -475,8 +475,9 @@ canvas {
 
 #dashcamHud {
   position: absolute;
-  top: 16px;
-  right: 280px; /* Next to the main HUD */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: rgba(15, 23, 42, 0.85);
   padding: 12px;
   border-radius: 8px;
