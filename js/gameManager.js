@@ -87,9 +87,9 @@ const GameManager = (() => {
   }
 
   function aiRespawnPoseFromCrash(crashX, crashY) {
-    const stepsBack = consecutiveCrashCount >= 3 ? 60 : 25;
     const centerline = Track.centerline();
     const n = centerline.length;
+    const stepsBack = Math.floor(n * (consecutiveCrashCount >= 3 ? 0.05 : 0.02));
     const infoIndex = Track.nearestCenterlineIndex(crashX, crashY);
     const idx = (infoIndex - stepsBack + n) % n;
     const p = centerline[idx];
@@ -297,7 +297,10 @@ const GameManager = (() => {
             for (let i = 0; i < CRASH_REPLAY_COUNT; i++) KNN.addDemonstration(lastDemoSensors, lastDemoSteering);
           }
         }
-        if (outcomeWindowStart > 0) crashedDuringOutcomeWindow = true;
+        if (outcomeWindowStart > 0) {
+          crashedDuringOutcomeWindow = true;
+          if (outcomeResolver) outcomeResolver();
+        }
         const currentProgress = Track.lapProgress(stateForCrash.x, stateForCrash.y);
         const sameSpot = lastCrashLapProgress >= 0 &&
           lapProgressDistance(currentProgress, lastCrashLapProgress) < SAME_SPOT_LAP_PROGRESS;
@@ -493,7 +496,7 @@ const GameManager = (() => {
 
       // If a decisive degradation happens during the window and a resolver exists,
       // finalize the outcome early instead of waiting for the timeout.
-      if (outcomeResolver && (carState.crashed || absDev > DEGRADED_THRESHOLD_CENTER_DEV)) {
+      if (outcomeResolver && absDev > DEGRADED_THRESHOLD_CENTER_DEV) {
         outcomeResolver();
       }
     }
@@ -588,11 +591,7 @@ const GameManager = (() => {
       outcomeWindowMaxAbsDeviation = 0;
       crashedDuringOutcomeWindow = false;
 
-      let outcomeResolved = false;
       outcomeResolver = () => {
-        if (outcomeResolved) return;
-        outcomeResolved = true;
-
         const stateNow  = Car.getState();
         let outcome;
         if (stateNow.crashed || crashedDuringOutcomeWindow) {
