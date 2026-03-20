@@ -134,6 +134,7 @@ const GameManager = (() => {
     });
     
     if (typeof UI.showControls === 'function') UI.showControls();
+    if (typeof UI.showDashcam === 'function') UI.showDashcam();
     await showIntro();
   }
 
@@ -495,19 +496,16 @@ const GameManager = (() => {
 
     // Steering: MLP output → smooth → clamp. No manual overrides.
     const steer = Math.max(-1, Math.min(1, result.steering));
-    const speedometerOff = !Sensors.getToggleMask()[2];
     
-    // Normal AI needs a low smoothing (0.1) to filter out its natural jitter.
-    // If Speed is OFF, we make it highly reactive (0.3) so the natural jitters crash it.
-    const steerSmooth    = speedometerOff ? 0.3 : 0.1;
-    aiSmoothedSteering += (steer - aiSmoothedSteering) * steerSmooth;
+    // Use the exact same steering physics as the human so the simulation is strictly fair.
+    aiSmoothedSteering += (steer - aiSmoothedSteering) * STEER_SMOOTH;
     aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);
 
     // Throttle:
-    // - Normal: stay in the demo-speed regime (≈0.7–0.75).
+    // Drive at the exact same full throttle the human used, so the speed sensor matches the training data.
     const lidarMin = Math.min(sensorsRaw[0], sensorsRaw[1], sensorsRaw[2], sensorsRaw[3], sensorsRaw[4]);
-    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 0.75 : 0.65;
+    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 1.0 : 0.4;
     Car.setThrottle(throttle);
 
     UI.updateConfidence(result.confidence);

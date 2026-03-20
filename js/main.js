@@ -47,7 +47,13 @@
 
     // Update DOM Mini HUD
     if (typeof UI.updateMiniHUD === 'function') {
-      UI.updateMiniHUD(Sensors.getLastValues(), Sensors.getToggleMask());
+      UI.updateMiniHUD(Sensors.rawValues(carState), Sensors.getToggleMask());
+    }
+
+    // Render 3D Dashcam feed
+    if (GameManager.getPhase() !== 'LOGIN' && GameManager.getPhase() !== 'INTRO') {
+      const slices = Sensors.generateCameraDashcam(carState);
+      UI.renderDashcam(slices, Sensors.getToggleMask()[1]); // toggleMask[1] is Camera
     }
 
     requestAnimationFrame(loop);

@@ -164,6 +164,15 @@
       <div id="miniHudContent"></div>
     </div>
 
+    <!-- Dashcam HUD (Represents the 'Camera' Sensor) -->
+    <div id="dashcamHud" class="hidden">
+      <div class="hud-label" style="display: flex; justify-content: space-between;">
+        <span>CAMERA FEED</span>
+        <span id="dashcamStatus" style="color: #34d399;">ON</span>
+      </div>
+      <canvas id="dashcamCanvas" width="320" height="120" style="border-radius: 4px; background: #000; margin-top: 4px;"></canvas>
+    </div>
+
     <!-- Controls HUD -->
     <div id="controlsHud" class="hidden">
       <div class="hud-label">CONTROLS</div>

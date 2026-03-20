@@ -29,6 +29,9 @@ const UI = (() => {
   const miniHud           = () => $('#miniHud');
   const miniHudContent    = () => $('#miniHudContent');
   const controlsHud       = () => $('#controlsHud');
+  const dashcamHud        = () => $('#dashcamHud');
+  const dashcamCanvas     = () => $('#dashcamCanvas');
+  const dashcamStatus     = () => $('#dashcamStatus');
 
   let onToggleCallback = null;
 
@@ -80,6 +83,7 @@ const UI = (() => {
     makeDraggable($('#hud'));
     makeDraggable($('#miniHud'));
     makeDraggable($('#controlsHud'));
+    makeDraggable($('#dashcamHud'));
     makeDraggable($('#experimentBanner'));
     makeDraggable($('#instructions'));
   });
@@ -470,6 +474,86 @@ const UI = (() => {
     hideDemoCount,
     showControls: () => controlsHud() && controlsHud().classList.remove('hidden'),
     hideControls: () => controlsHud() && controlsHud().classList.add('hidden'),
+    showDashcam: () => dashcamHud() && dashcamHud().classList.remove('hidden'),
+    hideDashcam: () => dashcamHud() && dashcamHud().classList.add('hidden'),
+    renderDashcam: (slices, isCameraOn) => {
+      const cvs = dashcamCanvas();
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      const w = cvs.width;
+      const h = cvs.height;
+      
+      const status = dashcamStatus();
+      if (status) {
+        status.textContent = isCameraOn ? 'ON' : 'OFFLINE';
+        status.style.color = isCameraOn ? '#34d399' : '#ef4444';
+      }
+
+      if (!isCameraOn) {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('NO SIGNAL', w/2, h/2 + 5);
+        
+        // Static noise effect
+        for (let i=0; i<400; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+          ctx.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+        }
+        return;
+      }
+
+      // Draw Global Sky
+      ctx.fillStyle = '#38bdf8'; // Sky Blue
+      ctx.fillRect(0, 0, w, h/2);
+
+      if (!slices || slices.length === 0) return;
+
+      const sliceWidth = w / slices.length;
+      for (let i = 0; i < slices.length; i++) {
+        const distNorm = slices[i]; 
+        const depth = Math.max(0, 1 - distNorm); 
+
+        // If it's too far, just draw the road and grass meeting at the horizon
+        if (depth < 0.05) {
+          ctx.fillStyle = '#1e293b'; // Road
+          ctx.fillRect(i * sliceWidth, h/2, sliceWidth + 0.5, h/2);
+          continue; 
+        }
+        
+        // True pseudo-3D raycaster heights
+        const fullWallH = Math.min(h * 3.0, (h * 0.6) / (distNorm + 0.05));
+        const baseY = h/2 + fullWallH / 2;
+        
+        // Make it a small racing curb (15% of a full wall height)
+        const curbH = fullWallH * 0.15; 
+        const wallY = baseY - curbH;
+
+        // 1. Draw Grass (Horizon down to the top of the curb)
+        if (wallY > h/2) {
+          ctx.fillStyle = '#22c55e'; // Bright Track grass color
+          ctx.fillRect(i * sliceWidth, h/2, sliceWidth + 0.5, wallY - h/2);
+        }
+
+        // 2. Draw Curb (Red/White or just shades of red)
+        const intensity = Math.floor(depth * 255);
+        ctx.fillStyle = `rgb(${intensity}, ${Math.floor(intensity * 0.15)}, ${Math.floor(intensity * 0.15)})`;
+        ctx.fillRect(i * sliceWidth, Math.max(h/2, wallY), sliceWidth + 0.5, curbH);
+        
+        // 3D edge
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(i * sliceWidth, Math.max(h/2, wallY), 1, curbH);
+
+        // 3. Draw Road (Base of curb down to bottom of screen)
+        if (baseY < h) {
+          ctx.fillStyle = '#1e293b'; // Road color
+          ctx.fillRect(i * sliceWidth, baseY, sliceWidth + 0.5, h - baseY);
+        }
+      }
+    },
     setTogglesDisabled,
     lockSensor,
     unlockSensor,

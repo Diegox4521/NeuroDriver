@@ -471,6 +471,20 @@ canvas {
   max-width: 600px;
 }
 
+/* ── Dashcam HUD ── */
+
+#dashcamHud {
+  position: absolute;
+  top: 16px;
+  right: 280px; /* Next to the main HUD */
+  background: rgba(15, 23, 42, 0.85);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  z-index: 10;
+}
+
 /* ── Controls HUD ── */
 
 #controlsHud {

@@ -97,7 +97,7 @@ const Sensors = (() => {
       v[2] = 0;
     }
     if (!toggleMask[2]) {
-      // Speedometer off → zero speed channel
+      // Speedometer off → zero speed channel (true ablation)
       v[5] = 0;
     }
     return v;
@@ -119,6 +119,22 @@ const Sensors = (() => {
   function rawValues(carState) {
     const { x, y, heading, normalizedSpeed } = carState;
     return applyMask(buildRaw(x, y, heading, normalizedSpeed));
+  }
+
+  // Dashcam pseudo-3D raycaster (high density)
+  function generateCameraDashcam(carState, fovDegrees = 75, numSlices = 80) {
+    const arr = [];
+    const fov = (fovDegrees * Math.PI) / 180;
+    const startAngle = carState.heading - fov / 2;
+    const angleStep = fov / numSlices;
+    for (let i = 0; i < numSlices; i++) {
+      const a = startAngle + i * angleStep;
+      const res = castRay(carState.x, carState.y, a);
+      // Cosine correction to prevent physical fisheye lens distortion
+      const correctedDist = res.dist * Math.cos(a - carState.heading);
+      arr.push(Math.min(1.0, correctedDist / RAY_MAX_DIST));
+    }
+    return arr;
   }
 
   // ── Drawing ──────────────────────────────────────────────────────────────
@@ -215,8 +231,9 @@ const Sensors = (() => {
     rawValues,
     draw,
     setToggle,
-    getToggleMask,
+    getToggleMask: () => toggleMask,
     resetToggles,
+    generateCameraDashcam,
     getLastValues: () => [...lastValues],
     RAY_MAX_DIST,
   };
