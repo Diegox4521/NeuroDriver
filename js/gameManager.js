@@ -31,11 +31,25 @@ const GameManager = (() => {
 
   const keys = {};
   const WASD_CODES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+
+  function isEditableFocusTarget(el) {
+    if (!el || el.disabled) return false;
+    if (el.isContentEditable) return true;
+    const tag = el.tagName;
+    if (tag === 'TEXTAREA') return true;
+    if (tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    const type = (el.type || 'text').toLowerCase();
+    const nonText = new Set(['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'hidden', 'image']);
+    return !nonText.has(type);
+  }
+
   window.addEventListener('keydown', e => {
+    if (isEditableFocusTarget(document.activeElement)) return;
     if (e.code.startsWith('Arrow') || WASD_CODES.has(e.code)) e.preventDefault();
     keys[e.code] = true;
   });
-  window.addEventListener('keyup',   e => { keys[e.code] = false; });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
 
   function steerTargetFromKeys() {
     let target = 0;
