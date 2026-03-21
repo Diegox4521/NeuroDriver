@@ -30,8 +30,22 @@ const GameManager = (() => {
   let paused         = false;
 
   const keys = {};
-  window.addEventListener('keydown', e => { if (e.code.startsWith('Arrow')) e.preventDefault(); keys[e.code] = true; });
+  const WASD_CODES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+  window.addEventListener('keydown', e => {
+    if (e.code.startsWith('Arrow') || WASD_CODES.has(e.code)) e.preventDefault();
+    keys[e.code] = true;
+  });
   window.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+  function steerTargetFromKeys() {
+    let target = 0;
+    if (keys['ArrowLeft']  || keys['KeyA']) target = -1;
+    if (keys['ArrowRight'] || keys['KeyD']) target =  1;
+    return target;
+  }
+  function throttleFromKeys() {
+    return (keys['ArrowUp'] || keys['KeyW']) ? 1 : 0;
+  }
 
   let lastRecordTime     = 0;
   const RECORD_INTERVAL  = 100;
@@ -227,7 +241,7 @@ const GameManager = (() => {
     Logger.logPhase('INTRO');
     await UI.showOverlay(
       'Welcome!',
-      'You are going to teach an AI how to drive. First, practice driving the car with the arrow keys. Then the AI will watch and learn from you.',
+      'You are going to teach an AI how to drive. First, practice driving the car with the arrow keys or WASD. Then the AI will watch and learn from you.',
       'Start Practice'
     );
     beginPractice();
@@ -239,7 +253,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     spaceWasDown = false;
     UI.setPhaseLabel('Practice: Learn the Controls');
-    UI.showInstruction('Practice driving! Arrow keys: ↑ accelerate, ← → steer. Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready.');
+    UI.showInstruction('Practice driving! Arrow keys or WASD: W/↑ accelerate, A/D or ← → steer. Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready.');
     UI.hideToggles();
     UI.hideConfidence();
     Car.respawn();
@@ -596,12 +610,10 @@ const GameManager = (() => {
 
   function updateHumanDriving(now) {
     if (!DEV_AUTO_DEMO) {
-      let target = 0;
-      if (keys['ArrowLeft'])  target = -1;
-      if (keys['ArrowRight']) target =  1;
+      const target = steerTargetFromKeys();
       smoothedSteering += (target - smoothedSteering) * STEER_SMOOTH;
       Car.setSteering(smoothedSteering);
-      Car.setThrottle(keys['ArrowUp'] ? 1 : 0);
+      Car.setThrottle(throttleFromKeys());
     } else {
       autoDemoController();
     }
@@ -645,12 +657,10 @@ const GameManager = (() => {
   // ── Practice ─────────────────────────────────────────────────────────────
 
   function updatePractice(now) {
-    let target = 0;
-    if (keys['ArrowLeft'])  target = -1;
-    if (keys['ArrowRight']) target =  1;
+    const target = steerTargetFromKeys();
     smoothedSteering += (target - smoothedSteering) * STEER_SMOOTH;
     Car.setSteering(smoothedSteering);
-    Car.setThrottle(keys['ArrowUp'] ? 1 : 0);
+    Car.setThrottle(throttleFromKeys());
     Sensors.compute(Car.getState());
     if (keys['Space'] && !spaceWasDown) { spaceWasDown = true; beginSensorIntro(); return; }
     spaceWasDown = keys['Space'];
