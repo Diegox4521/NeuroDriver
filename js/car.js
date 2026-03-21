@@ -80,9 +80,10 @@ const Car = (() => {
     if (t > 0) speed = Math.min(MAX_SPEED, speed + ACCEL * t);
     else speed = Math.max(0, speed - FRICTION);
 
-    // Steering only has effect when moving
-    if (speed > 0.1) {
-      heading += steering * TURN_RATE * (speed / MAX_SPEED);
+    // Steering at low speed: avoid near-zero turn when speed/MAX_SPEED is tiny
+    if (speed > 0.05) {
+      const speedFactor = Math.max(0.3, speed / MAX_SPEED);
+      heading += steering * TURN_RATE * speedFactor;
     }
 
     x += Math.cos(heading) * speed;

@@ -1,248 +1,307 @@
-# Phase D — Implementation plan (revised)
+# Glass Box AI Driver — Phase D Implementation Plan (Current)
 
-This document merges the ordered implementation steps with **six plan fixes** (script order, Step 6 merge, `near_miss` labels, mini-HUD timing, Step 12 verification, 6D→7D demo note). Research hooks, crash-loop mitigation, and verification structure are otherwise **approved as-is**.
+This is the **current working design** after professor pilot feedback, sensor redesign iterations, and MLP reliability testing. It **supersedes** all previous Phase D drafts (including the four-sensor / “Thermal” variant).
 
 ---
 
-## Plan fixes (apply to all steps below)
+## Implementation strategy (read this first)
 
-### Fix 1 — Script load order (`index.html`)
+**Do Part I before Part II.** Ablation **rounds, locks, banners, logging, and toggle flow** are easier to validate in isolation. The **pedestrian**, **7D vector**, **near-miss**, and **proximity visuals** share tight coupling—leave that block for **last**, after round timing and `Logger`/`UI` plumbing behave.
 
-Load **`pedestrian.js` immediately after `track.js` and before `car.js`**. Loading it only before `gameManager.js` is **too late** because `car.js` calls `Pedestrian.*`.
+| Part | Focus | Depends on |
+|------|--------|------------|
+| **I** | Rounds & session flow | Current codebase (6D) |
+| **II** | Pedestrian + 7D + near-miss + HUD/ring | Part I complete recommended |
+| **III** | Full session test & tuning | Parts I + II |
 
-**Correct script order:**
+---
 
-1. `track.js`
-2. `pedestrian.js`
-3. `car.js`
-4. `sensors.js`
-5. `knn.js`
-6. `logger.js`
-7. `ui.js`
-8. `gameManager.js`
-9. `main.js`
+## What this plan reflects
 
-*(Logical dependency: `track` → `pedestrian` → `car` → rest.)*
+- Three **student-facing** sensors; **seven** internal MLP inputs.
+- **Camera** = pure pedestrian proximity scalar (`Pedestrian.proximityValue`), **not** forward ray / lane geometry—no interference with chicane steering (MLP leans on LiDAR there; camera ~0 far from pedestrian).
+- **Near-miss** behavior and ethics narrative stay tied to **Camera off** + drift toward inner wall (see placement below).
 
-### Fix 2 — Step 6 is a merge, not a replace
+---
 
-`gameManager.js` **already** includes crash-streak logic, wrap-aware same-spot distance, `resetCrashStreak()`, and `crash_loop_nudge` logging. **Do not rewrite** that block.
+## Final sensor design
 
-Step 6 means: **merge in** only:
+| Toggle | Name | Internal index | Computation when ON | When OFF | Failure mode |
+|--------|------|----------------|----------------------|----------|--------------|
+| 0 | LiDAR | indices **0–4** | Five raycasts at −60°, −30°, 0°, +30°, +60° | All five rays zero | Immediate wall crash, geometry blind |
+| 1 | Camera | index **5** | `Pedestrian.proximityValue(x, y)` | Proximity zero | Passes through pedestrian zone; person blind |
+| 2 | Speedometer | index **6** | `speed / MAX_SPEED` | Speed zero; throttle logic may boost AI throttle | Wobbles, overshoots corners |
 
-- `nearMissDuringOutcomeWindow` and `onNearMiss()` / `Logger.logNearMiss`
-- Outcome classification branch for `near_miss`
-- Reset `nearMissDuringOutcomeWindow` where appropriate
+**Internal 7D vector:**
 
-Leave existing streak, respawn, banner, and `crash_loop_nudge` behavior intact.
+`[leftFar, leftNear, forward, rightNear, rightFar, camera, speed]`
 
-### Fix 3 — `OUTCOME_LABELS` in `gameManager.js`
+---
+
+## Pedestrian placement
+
+The pedestrian sits **~30px from the centerline toward the inner wall** on the **top straight**—not on the centerline (car would hit every lap), not so far that `Camera` never rises above **0.5** on a normal pass.
+
+```
+[inner wall]
+      ● pedestrian (~30px from centerline)
+- - - - - - - centerline - - - - - - -   ← car path
+[outer wall]
+```
+
+- **Near-miss radius:** 35px. A centered car should **not** enter it; with **Camera off**, drift toward the inner wall can enter it.
+- **Proximity range:** `PROXIMITY_MAX_RANGE = 150` (tune in Part III if needed).
+
+---
+
+## Script load order (`index.html`)
+
+```
+track.js → pedestrian.js → car.js → sensors.js → knn.js → logger.js → ui.js → gameManager.js → main.js
+```
+
+`pedestrian.js` **before** `car.js` because `car.js` calls `Pedestrian.*`.
+
+*Note:* Until Part II adds `pedestrian.js`, keep the current order; **insert** `pedestrian.js` when you start Part II Step II-2.
+
+---
+
+# Part I — Rounds & flow (implement first)
+
+These steps use the **existing 6D** pipeline where noted. Do **not** add `pedestrian.js` or change `INPUT_SIZE` yet.
+
+### I-1 — Steering fix (`car.js`)
+
+Allow turning at low speed so students are not stuck when barely moving:
+
+```javascript
+if (speed > 0.05) {
+  const speedFactor = Math.max(0.3, speed / MAX_SPEED);
+  heading += steering * TURN_RATE * speedFactor;
+}
+```
+
+**Verify:** Car steers while barely moving; forgiving through corners.
+
+---
+
+### I-2 — Logger groundwork (`logger.js`)
+
+- Bump **`dataFormatVersion`** to **`'4.0'`** when you are ready to freeze schema (can be end of Part I or start of Part II—pick one cutover and hard-refresh demos after).
+- Keep **`sensorCount: 3`**, **`sensors: ['lidar', 'camera', 'speedometer']`**.
+- Add config keys (values can be **`null`** until Part II):  
+  `ablationRound1Ms`, `ablationRound2Ms`, `nearMissRadius`, `nearMissSlowDuration`, `nearMissSpeedFactor`, `pedestrianX`, `pedestrianY`, `cameraIsPedestrianProximity: true`.
+- Ensure **every toggle log** can carry **`ablationRound`** (wire from `gameManager` once I-3 exists).
+- Add **`near_miss`** as a valid **prediction/outcome** on toggle events when the modal supports it (I-4 can stub UI; schema should accept it).
+- Add **`nearMissCount`** (start at `0`) and a **`logNearMiss(...)`** function that **no-ops or only increments** until Part II—then implement full logging.
+
+**Verify:** Downloaded JSON shows v4.0, round fields, and stable toggle events with round numbers.
+
+---
+
+### I-3 — Ablation rounds in `gameManager.js` (merge only)
+
+**Do not rewrite** crash streak, `resetCrashStreak()`, `crash_loop_nudge`, or AI respawn / `stepsBack` logic.
 
 Add:
 
-```javascript
-near_miss: 'Almost hit the pedestrian',
-```
+- `ablationRound`, `ROUND_1_DURATION_MS` / `ROUND_2_DURATION_MS` (e.g. 90s each).
+- In **`beginAblation`:** `ablationRound = 1` and **lock Speedometer** (`UI.lockSensor(2)`).
+- In **`update`** (or equivalent phase tick): when `currentPhase === 'AI_ABLATION' && ablationRound === 1 && phaseElapsed >= ROUND_1_DURATION_MS`, advance to round 2, **`UI.unlockSensor(2)`**, banner, `Logger.logEvent('ablation_round_2', {})`. Use the **same `phaseElapsed`** used elsewhere so time **does not advance while paused** (prediction modals, etc.).
+- Pass **`ablationRound`** into **both** `Logger.logToggle` call sites.
+- `Logger.setConfig`: at minimum **round duration ms** in Part I; add pedestrian/near-miss config in Part II when values exist.
 
-Without this, feedback banners can show `undefined` when the outcome is `near_miss`.
+**Defer to Part II:** `onNearMiss`, `nearMissDuringOutcomeWindow`, outcome branch `near_miss`, Speedometer-off **throttle** formula that assumes **7D** indices (0–4 LiDAR, 6 speed)—that throttle must use **`Sensors.getToggleMask()[2]`** and the **post–Part II** raw vector layout.
 
-### Fix 4 — Mini-HUD: update once only
-
-Steps 3 and 8 both mentioned the mini-HUD. **Update the mini-HUD only in Step 8** (after all four sensors and HUD rows are stable). **Do not** change mini-HUD in Step 3.
-
-### Fix 5 — Step 12 thermal verification (no auto-demo thermal)
-
-The **auto-demo controller** follows the centerline only; it **does not** read Thermal. Any check that “auto-demo adjusts its line when Thermal is ON” will **fail** by design.
-
-**Revised Step 12 verification:**
-
-- Set **`DEV_AUTO_DEMO` to `false`**, drive **manually** past the pedestrian with **Thermal ON**, and confirm the Thermal value in the mini-HUD rises **above 0.6** when passing within range.
-- Any **line adjustment** from Thermal is a property of the **trained MLP after demos**, not the auto-demo loop. Verify MLP/thermal interaction **after** a full demo session is collected and the model is trained—not via the centerline auto-demo.
-
-### Fix 6 — 6D → 7D invalidates old demos
-
-Moving KNN input from **6D to 7D** invalidates any cached or reused demo vectors from older builds.
-
-**Testing protocol note:** Always **hard refresh** before recording demos; **never** reuse demo data across the **6D → 7D** transition.
+**Verify:** Round 1 locks Speedometer; at 90s unlock + banner; toggles log with correct round; pause does not “eat” round time incorrectly.
 
 ---
 
-## Implementation watch-outs (before the agent starts)
+### I-4 — UI hooks (`ui.js` / `index.html` if needed)
 
-The plan is **clean and ready to execute**: all **six fixes** above are correctly incorporated and the **step order** is sound. The items below are **three additional watch-outs** for the agent (not duplicates of those fixes).
+- Confirm **ranking** remains **3 items** (pre/post).
+- Ensure **`lockSensor` / `unlockSensor`** (or equivalent) work for modality **2** (Speedometer).
+- Optional during Part I: add **fourth prediction option** only when wiring Camera toggle—if you prefer zero UI churn until Part II, skip and do in II-6.
 
-### Watch-out A — Step 3 masking indices (thermal vs speed)
-
-The 7D vector is:
-
-`[leftFar, leftNear, forward, rightNear, rightFar, thermal, speed]` → indices **0–4** rays, **5** thermal, **6** speed.
-
-**Double-check:** when **Speedometer** is off (`toggleMask[3]`), masking must zero **index 6** (speed), **not** index 5. Thermal off (`toggleMask[2]`) zeros **index 5**. It is easy to swap 5 and 6 and silently break the experiment.
-
-### Watch-out B — Step 7 round transition timing
-
-The round timer must run against **`phaseElapsed`** (already computed in `update()` from `phaseStartTime`), **not** a separate internal timer. Otherwise time **does not pause** when **`paused === true`** during prediction modals.
-
-Example pattern (illustrative): `currentPhase === 'AI_ABLATION' && ablationRound === 1 && phaseElapsed >= ROUND_1_DURATION_MS` — use the **same** `phaseElapsed` variable used elsewhere for the phase timer.
-
-### Watch-out C — Step 8 `data-modality` and hardcoded indices
-
-In current Option B code, **Speedometer** is `data-modality="2"`. After adding **Thermal** as `data-modality="2"` and shifting **Speedometer** to `data-modality="3"`, **audit every place** in `ui.js`, `gameManager.js`, and elsewhere that assumes a fixed sensor index (e.g. speedometer === 2, or `sensorIndex === 2` meaning speed). Those assumptions will **silently break** unless updated to the 4-sensor layout.
-
-Aside from these three watch-outs, the plan is correct and each step remains **independently testable**. **Start with Step 1** when handing work to an agent.
+**Verify:** Round locks visibly match `gameManager` behavior.
 
 ---
 
-## Ordered steps (each independently testable)
+### I-5 — Part I smoke test
 
-### Step 1 — Find pedestrian coordinates (temporary)
-
-**File:** `main.js` (temporary)
-
-Add a temporary `console.log` of car X and Y every second. Drive one full lap and record coordinates on the **top straight centerline midpoint**. Remove the log when done.
-
-**Verify:** You have `PED_X` and `PED_Y` on the centerline of the top straight, away from both curves.
+Hard refresh. Run through ablation with **DEV_AUTO_DEMO** as you usually do. Confirm round transition and logging only.
 
 ---
 
-### Step 2 — Create `pedestrian.js`
+# Part II — Pedestrian, 7D, near-miss, visuals (implement last)
 
-**File:** `js/pedestrian.js` (new)
+Complete steps **in order**—each step assumes the previous.
 
-- `PED_X`, `PED_Y` from Step 1
-- `NEAR_MISS_RADIUS = 35`
-- `THERMAL_MAX_RANGE = 150`
-- `distanceTo(carX, carY)` → `Math.hypot`
-- `isNearMiss(carX, carY)` → distance `< NEAR_MISS_RADIUS`
-- `thermalValue(carX, carY)` → `Math.max(0, 1 - distanceTo(...) / THERMAL_MAX_RANGE)`
-- `draw(ctx)` — orange circle r=8, white stroke, faint orange ring r=14
+### II-1 — Find pedestrian coordinates (`main.js`, temporary)
 
-**File:** `index.html` — add `<script src="js/pedestrian.js"></script>` per **Fix 1** (after `track.js`, before `car.js`).
+Temp **`console.log`** of car **x, y** ~1 Hz. Drive one lap; record midpoint of **top straight**, then offset **~30px toward inner wall**. Remove log when done.
 
-**File:** `main.js` — add `Pedestrian.draw(ctx)` after `Car.draw(ctx)`.
-
-**Verify:** Pedestrian visible on top straight, on centerline.
+**Verify:** You have stable `PED_X`, `PED_Y` before coding constants.
 
 ---
 
-### Step 3 — Add Thermal to `sensors.js`
+### II-2 — `pedestrian.js` + script order + draw
 
-**File:** `js/sensors.js`
+New **`js/pedestrian.js`** (IIFE) with:
 
-- `SENSOR_NAMES`: `['LiDAR', 'Camera', 'Thermal', 'Speedometer']`
-- `SENSOR_COLORS`: add orange `#f97316` for Thermal
-- `toggleMask`: `[true, true, true, true]` (length 4)
-- `buildRaw`: return **7** elements: `[leftFar, leftNear, forward, rightNear, rightFar, thermal, speed]` with `thermal = Pedestrian.thermalValue(x, y)`
-- Masking: `[0]` off → 0–4; `[1]` off → index 2; `[2]` off → index **5** (thermal); `[3]` off → index **6** (speed) — see **Watch-out A**
-- `resetToggles` → `[true, true, true, true]`
+- `PED_X`, `PED_Y` from II-1  
+- `NEAR_MISS_RADIUS = 35`, `PROXIMITY_MAX_RANGE = 150`  
+- `distanceTo`, `isNearMiss`, `proximityValue`, `draw` (orange fill r=8, white stroke, faint ring r=14)  
+- Export constants for logger config
 
-**Do not** update mini-HUD here — **Fix 4** (defer to Step 8).
+**`index.html`:** insert `<script src="js/pedestrian.js"></script>` **after `track.js`, before `car.js`**.
 
-**Verify:** Four logical sensor channels behave; thermal rises when near pedestrian (e.g. via logging or temporary debug if needed).
+**`main.js`:** `Pedestrian.draw(ctx)` **after** `Car.draw(ctx)`.
 
----
-
-### Step 4 — Update `knn.js`
-
-- `INPUT_SIZE`: **6 → 7**
-- Confidence max distance: `Math.sqrt(6)` → `Math.sqrt(7)`
-
-**Verify:** No console errors; demo recording + train still run.
+**Verify:** Pedestrian visible, offset from centerline.
 
 ---
 
-### Step 5 — Near-miss in `car.js`
+### II-3 — `sensors.js` (7D, Camera = proximity only)
 
-Add `nearMissActive`, `nearMissTimer`, `NEAR_MISS_SLOW_DURATION`, `NEAR_MISS_SPEED_FACTOR`; after wall collision, near-miss detection + slow; body color orange `#f97316` when active; expose `isNearMissActive`.
+- Still **three** toggles: `SENSOR_NAMES` unchanged.
+- **`buildRaw`:** five rays unchanged; **`camera = Pedestrian.proximityValue(x, y)`**; **`speed`** normalized as today.
+- **Masking:** `[0]` off → 0–4; `[1]` off → **5**; `[2]` off → **6** (do **not** swap 5 and 6).
+- **`resetToggles`:** `[true, true, true]`.
+- **Do not** update mini-HUD here (**II-7 only**).
 
-**Verify:** Manual drive into pedestrian: orange flash, slow ~1s, no crash.
-
----
-
-### Step 6 — `gameManager.js` — near-miss + outcome (merge only)
-
-**Merge** into existing code per **Fix 2** and **Fix 3**:
-
-- `nearMissDuringOutcomeWindow` (if not present)
-- `onNearMiss()` → set flag during outcome window + `Logger.logNearMiss(...)`
-- Outcome resolver: `near_miss` branch after crash checks, before `slow` / `fine`; clear `nearMissDuringOutcomeWindow` after resolve
-- Keep existing crash streak, `resetCrashStreak()`, `crash_loop_nudge`, AI respawn `stepsBack` logic **unchanged**
-
-**Verify:** Near-miss logs; toggles reset streak as today; farther-back respawn after 3 same-spot crashes unchanged.
+**Verify:** Camera ~0 away from top straight; **> 0.5** within 150px of pedestrian; flat through chicane.
 
 ---
 
-### Step 7 — Round structure in `gameManager.js`
+### II-4 — `knn.js`
 
-`ablationRound`, `ROUND_1_DURATION_MS`, `ROUND_2_DURATION_MS`; `beginAblation` sets round 1 and locks sensors 2 and 3; transition at 90s to round 2 + unlock + banner + `Logger.logEvent('ablation_round_2')`; pass `ablationRound` into `Logger.logToggle`; `Logger.setConfig` includes round durations.
+- `INPUT_SIZE`: **6 → 7** (confidence uses `Math.sqrt(INPUT_SIZE)`).
 
-Use **`phaseElapsed`** for the round-1 duration check so time **stops advancing while paused** (prediction modals, etc.) — see **Watch-out B**.
+**Protocol:** 6D→7D **invalidates** old demos—hard refresh; never reuse old demo files.
 
-**Verify:** Round 1 locks Thermal + Speedometer; at 90s both unlock; toggles log round.
-
----
-
-### Step 8 — `ui.js` + `index.html` + mini-HUD
-
-- Thermal prediction: 4 options when `sensorIndex === 2` (includes `near_miss`)
-- Sensor intro: **4** panels (Thermal copy per original spec)
-- Ranking: **4** items
-- **`main.js` mini-HUD:** **4** rows (LiDAR, Camera, Thermal, Speedometer) — **only place** mini-HUD is updated (**Fix 4**)
-- `index.html`: fourth toggle for Thermal (`data-modality="2"`), Speedometer (`data-modality="3"`), lock affordances as specified
-
-After changing modality indices, **grep/audit** `ui.js` and `gameManager.js` (and any other files) for **hardcoded `2` / `3` sensor indices** that assumed old Option B mapping — see **Watch-out C**.
-
-**Verify:** Thermal toggle shows 4 predictions; others 3; intro + ranking have 4; mini-HUD matches.
+**Verify:** Record + train with no console errors.
 
 ---
 
-### Step 9 — (covered in Step 8)
+### II-5 — Near-miss in `car.js`
 
-Index/HTML updates consolidated with Step 8 above.
+State: `nearMissActive`, `nearMissTimer`, `nearMissTargetSpeed`, `NEAR_MISS_SLOW_DURATION`, `NEAR_MISS_SPEED_FACTOR`.
 
----
+After wall collision handling, if `Pedestrian.isNearMiss(x, y)` and not already active: set active, timer, target speed, call **`GameManager.onNearMiss()`** if defined.
 
-### Step 10 — `logger.js` v4.0
+While active: decay timer, ease speed toward target; orange body **`#f97316`**; expose **`isNearMissActive`**.
 
-- `dataFormatVersion: '4.0'`
-- `sensorCount: 4`, sensors array includes thermal
-- Config: thermal range, near-miss params, pedestrian coords, round durations
-- `nearMissCount`, `logNearMiss`, valid `near_miss` on toggles
-
-**Verify:** Downloaded JSON contains new fields and events.
+**Verify:** Manual drive into near-miss zone: orange flash, ~1s slow, **no crash** (per design).
 
 ---
 
-### Step 11 — Full session test
+### II-6 — `gameManager.js` — near-miss outcomes + AI throttle + Camera predictions
 
-Run full session with protocol from **Fix 6** (hard refresh). Exercise rounds, thermal prediction, near-miss, crash streak, JSON export, 4-item rankings.
+**Merge** into existing code (still preserve crash-streak block):
 
----
+- `OUTCOME_LABELS.near_miss`: `'Almost hit the pedestrian'`
+- `nearMissDuringOutcomeWindow`; **`onNearMiss()`** → set flag during outcome window + **`Logger.logNearMiss`**
+- Outcome order: **crash** → **near_miss** → **slow** → **fine**; clear `nearMissDuringOutcomeWindow` after resolve
+- **Speedometer-off throttle** (7D raw): e.g. `speedometerOff = !Sensors.getToggleMask()[2]`; `lidarMin = min(raw[0..4])`; throttle map as in your spec (1.0 when speed off, else stepped values vs confidence + `lidarMin`)
+- **`handleToggle`:** when **`sensorIndex === 1`** (Camera), prediction modal shows **4** options including **`near_miss`**
+- Export **`onNearMiss`** on the public `GameManager` API
 
-### Step 12 — Tune thermal (revised per Fix 5)
-
-- Manual drive, Thermal ON, confirm HUD thermal **> 0.6** near pedestrian; adjust `PED_X`/`PED_Y` if needed
-- Do **not** expect auto-demo to react to thermal
-- MLP “steers away” only **after** training on 7D demos — verify separately post-training
-
----
-
-## Order summary
-
-| Step | Focus |
-|------|--------|
-| 1 | Pedestrian coordinates (temp log) |
-| 2 | `pedestrian.js` + script order **Fix 1** + draw |
-| 3 | `sensors.js` 7D + 4 toggles (**no** mini-HUD — **Fix 4**) |
-| 4 | `knn.js` 7D (**Fix 6** note for testers) |
-| 5 | `car.js` near-miss |
-| 6 | `gameManager.js` merge near-miss/outcomes (**Fix 2**, **Fix 3**) |
-| 7 | Rounds + locks |
-| 8 | UI + HTML + **mini-HUD once** (**Fix 4**) |
-| 10 | Logger v4.0 |
-| 11 | Full session |
-| 12 | Thermal tune + revised verification (**Fix 5**) |
+**Verify:** Near-miss logs; toggles + streak behavior unchanged; Camera modal has four outcomes; AI throttle visibly higher with Speedometer off.
 
 ---
 
-*End of revised plan.*
+### II-7 — Proximity ring + mini-HUD (`main.js` + `ui.js`)
+
+**After `Pedestrian.draw`:** if Camera toggle on and `proximityValue > 0.05`, draw pulsing/shrinking orange ring around pedestrian (radius from proximity, e.g. `150 * (1 - pedVal) + 14`, stroke alpha ~`pedVal * 0.6`). **Hidden when Camera off.**
+
+Keep dashcam orange overlay consistent with proximity (already aligned if it reads same signal).
+
+**Mini-HUD — update here and only here:** **three** rows: LiDAR (e.g. min of rays), **Camera** (proximity scalar), Speedometer.
+
+**Verify:** Ring shrinks approaching pedestrian; off when Camera toggled off; mini-HUD matches.
+
+---
+
+### II-8 — `ui.js` copy + predictions
+
+- Sensor intro **Camera** panel: e.g. *“Detects nearby people — like the pedestrian detection camera on a real self-driving car. When it's off the AI can't see the person on the road ahead.”*
+- Prediction options: **4** when `sensorIndex === 1`, **3** otherwise (see II-6).
+- Ranking: still **3** items.
+
+**Verify:** Copy matches behavior; LiDAR/Speedometer three options; Camera four.
+
+---
+
+### II-9 — `logger.js` completion
+
+- Fill **`logNearMiss`** implementation; increment **`nearMissCount`** as appropriate.
+- Set **`pedestrianX` / `pedestrianY`** and numeric near-miss params in **`setConfig`**.
+
+**Verify:** JSON exports show near-miss events and full v4.0 config.
+
+---
+
+# Part III — Full session test & tuning
+
+### III-1 — Full session (after I + II)
+
+Hard refresh. With **DEV_AUTO_DEMO** on (where you use it):
+
+- AI chicane with all sensors on
+- Round 1 locks Speedometer; Round 2 unlock ~90s + banner
+- Camera toggle exposes near-miss prediction
+- Near-miss can fire when appropriate (e.g. Camera off + drift)
+- Proximity ring + mini-HUD
+- Crash streak / respawn unchanged
+- JSON clean; rankings **3** items each way
+
+### III-2 — Manual tune (`DEV_AUTO_DEMO` off)
+
+- Camera ~0 except top straight; **> 0.5** within 150px; flat in chicane
+- Trained MLP + Camera on: pass **near** pedestrian, not through
+- Camera off: can produce near-miss / line through zone
+- If near-miss never fires with Camera off: tighten **`PROXIMITY_MAX_RANGE`** or move pedestrian slightly toward path
+- If AI **hits** pedestrian with Camera on: move pedestrian slightly **farther** from centerline
+
+---
+
+## Order summary (execution order)
+
+| Step | Part | Files / focus |
+|------|------|----------------|
+| I-1 | I | `car.js` — low-speed steering |
+| I-2 | I | `logger.js` — v4 schema, rounds on toggles, stubs for pedestrian/near-miss |
+| I-3 | I | `gameManager.js` — ablation rounds, lock/unlock Speedometer, `phaseElapsed` |
+| I-4 | I | `ui.js` / HTML — locks, ranking (3) |
+| I-5 | I | Smoke test — rounds only |
+| II-1 | II | Temp coords |
+| II-2 | II | `pedestrian.js`, `index.html`, `main.js` draw |
+| II-3 | II | `sensors.js` — 7D, masking |
+| II-4 | II | `knn.js` — `INPUT_SIZE` 7 |
+| II-5 | II | `car.js` — near-miss |
+| II-6 | II | `gameManager.js` — outcomes, throttle, Camera 4 predictions |
+| II-7 | II | `main.js` + `ui.js` — ring, mini-HUD |
+| II-8 | II | `ui.js` — intro copy, predictions |
+| II-9 | II | `logger.js` — full near-miss + config |
+| III-1 | III | Full session |
+| III-2 | III | Manual tune |
+
+---
+
+## Research hypotheses
+
+- **H1 (Primary, Round 1):** Students predict **Camera** ablation outcomes less accurately than **LiDAR**, because LiDAR failure yields rapid wall contact while Camera failure yields a **near-miss** that is harder to anticipate.
+- **H2 (Primary, ranking):** Post-ablation sensor importance rankings differ from pre-ablation; Kendall tau pre→post **> 0**. Expected ordering: LiDAR → Camera → Speedometer.
+- **H3 (Secondary, Round 2):** **Speedometer** prediction accuracy lower than LiDAR and Camera (speed increase not visible; steering effect abstract).
+- **H4 (Exploratory, ethics):** Students who see a **Camera** near-miss write **longer** post-survey ethics responses about why cars must detect people than those whose Camera toggle only produced wobble/fine.
+
+---
+
+## Methods blurb (paper)
+
+The system used **three** student-facing sensors. **LiDAR** comprised five directional raycasts encoding wall proximity. **Camera** encoded **pedestrian proximity** as a single scalar **independent of wall geometry**, rising toward 1.0 as the vehicle approached a stationary pedestrian on the top straight. **Speedometer** encoded normalized speed. All three fed a **seven-dimensional** MLP input trained on student demonstrations via batch gradient descent. Ablation **zeroed** the corresponding channels while **weights stayed fixed**.
+
+---
+
+*End of Phase D plan (current).*

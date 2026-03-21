@@ -64,9 +64,6 @@
   const condition = params.get('condition') || params.get('c') || null;
   Logger.setParticipant(participantId, condition);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966069'},body:JSON.stringify({sessionId:'966069',location:'main.js:69',message:'before GameManager.start',data:{gameManagerType:typeof GameManager,hasStart:typeof GameManager!=='undefined'&&typeof GameManager.start,__gmReturned:typeof window!=='undefined'&&!!window.__gmReturned},timestamp:Date.now(),hypothesisId:'main-GM-check'})}).catch(()=>{});
-  // #endregion
   GameManager.start();
   requestAnimationFrame(loop);
 })();

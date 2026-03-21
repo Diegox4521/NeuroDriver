@@ -266,16 +266,34 @@ const UI = (() => {
       const buttonsDiv = $('#rankingButtons');
       const listDiv = $('#rankingList');
       const resetBtn = $('#rankingReset');
+      const submitBtn = $('#rankingSubmit');
 
       titleEl.textContent = titleText;
       subtitleEl.textContent = subtitleText;
       buttonsDiv.innerHTML = '';
       listDiv.innerHTML = '';
       resetBtn.classList.add('hidden');
+      submitBtn.classList.add('hidden');
 
       const sensorNames = Sensors.SENSOR_NAMES;  // 3 sensors: LiDAR, Camera, Speedometer
       const ordinals = ['1st', '2nd', '3rd'];
       const ranking = [];
+
+      function moveRank(index, delta) {
+        const j = index + delta;
+        if (j < 0 || j >= ranking.length) return;
+        const tmp = ranking[index];
+        ranking[index] = ranking[j];
+        ranking[j] = tmp;
+        render();
+      }
+
+      function finish() {
+        modal.classList.add('hidden');
+        submitBtn.onclick = null;
+        resetBtn.onclick = null;
+        resolve([...ranking]);
+      }
 
       function render() {
         buttonsDiv.innerHTML = '';
@@ -289,33 +307,67 @@ const UI = (() => {
           btn.onclick = () => {
             ranking.push(name);
             render();
-            if (ranking.length === 3) {
-              setTimeout(() => {
-                modal.classList.add('hidden');
-                resolve([...ranking]);
-              }, 600);
-            }
           };
           buttonsDiv.appendChild(btn);
         });
 
         ranking.forEach((name, i) => {
-          const item = document.createElement('div');
-          item.className = 'rank-item';
-          item.textContent = `${ordinals[i]} \u2014 ${name}`;
-          listDiv.appendChild(item);
+          const row = document.createElement('div');
+          row.className = 'rank-item-row';
+
+          const label = document.createElement('span');
+          label.className = 'rank-item-label';
+          label.textContent = `${ordinals[i]} \u2014 ${name}`;
+
+          const moves = document.createElement('div');
+          moves.className = 'rank-item-moves';
+
+          const isFirst = i === 0;
+          const isLast = i === ranking.length - 1;
+
+          if (!isFirst) {
+            const up = document.createElement('button');
+            up.type = 'button';
+            up.className = 'rank-move-btn';
+            up.setAttribute('aria-label', 'Move up');
+            up.textContent = '\u2191';
+            up.onclick = () => moveRank(i, -1);
+            moves.appendChild(up);
+          }
+          if (!isLast) {
+            const down = document.createElement('button');
+            down.type = 'button';
+            down.className = 'rank-move-btn';
+            down.setAttribute('aria-label', 'Move down');
+            down.textContent = '\u2193';
+            down.onclick = () => moveRank(i, 1);
+            moves.appendChild(down);
+          }
+          row.appendChild(label);
+          row.appendChild(moves);
+          listDiv.appendChild(row);
         });
 
-        if (ranking.length > 0 && ranking.length < 3) {
+        if (ranking.length > 0) {
           resetBtn.classList.remove('hidden');
         } else {
           resetBtn.classList.add('hidden');
+        }
+
+        if (ranking.length === 3) {
+          submitBtn.classList.remove('hidden');
+        } else {
+          submitBtn.classList.add('hidden');
         }
       }
 
       resetBtn.onclick = () => {
         ranking.length = 0;
         render();
+      };
+
+      submitBtn.onclick = () => {
+        if (ranking.length === 3) finish();
       };
 
       modal.classList.remove('hidden');
@@ -421,6 +473,29 @@ const UI = (() => {
     instructionsEl().classList.remove('hidden');
   }
 
+  /** Main teaching line + optional persistent tip (fixed strings only). */
+  function showInstructionWithTip(mainText, tipText) {
+    const wrap = instructionsEl();
+    const el = instructionText();
+    el.textContent = '';
+    el.appendChild(document.createTextNode(mainText));
+    if (tipText) {
+      el.appendChild(document.createElement('br'));
+      const sp = document.createElement('span');
+      sp.className = 'instruction-tip';
+      sp.textContent = tipText;
+      el.appendChild(sp);
+    }
+    wrap.classList.remove('hidden');
+  }
+
+  function pulseInstructionPanel() {
+    const wrap = instructionsEl();
+    if (!wrap) return;
+    wrap.classList.add('instruction-pulse');
+    setTimeout(() => wrap.classList.remove('instruction-pulse'), 900);
+  }
+
   function hideInstruction() {
     instructionsEl().classList.add('hidden');
   }
@@ -462,6 +537,8 @@ const UI = (() => {
     showPrediction,
     showReflection,
     showInstruction,
+    showInstructionWithTip,
+    pulseInstructionPanel,
     hideInstruction,
     setPhaseLabel,
     setTimer,

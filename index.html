@@ -36,7 +36,7 @@
         </button>
         <button class="sensor-btn active" data-modality="1">
           <span class="sensor-name">Camera</span>
-          <span class="sensor-desc">Reads lane position to stay centered</span>
+          <span class="sensor-desc">Reads how far ahead the road is clear</span>
         </button>
         <button class="sensor-btn active" data-modality="2">
           <span class="sensor-name">Speedometer</span>
@@ -86,7 +86,7 @@
           <div class="sensor-panel">
             <div class="sensor-icon">📷</div>
             <div class="sensor-panel-name">Camera</div>
-            <div class="sensor-panel-desc">Reads lane position to stay centered — like Tesla lane-keeping assist</div>
+            <div class="sensor-panel-desc">Forward view like the dashcam: how much open road you have before the walls. It does not read lane stripes or GPS — just distance ahead along where you&rsquo;re pointed.</div>
           </div>
           <div class="sensor-panel">
             <div class="sensor-icon">⏱️</div>
@@ -108,6 +108,7 @@
         <p id="rankingSubtitle" class="ranking-instruction"></p>
         <div id="rankingButtons" class="ranking-buttons"></div>
         <div id="rankingList" class="ranking-list"></div>
+        <button id="rankingSubmit" class="primary-btn ranking-submit hidden">Submit ranking</button>
         <button id="rankingReset" class="secondary-btn ranking-reset hidden">Reset</button>
       </div>
     </div>

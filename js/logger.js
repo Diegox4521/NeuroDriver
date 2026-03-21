@@ -1,8 +1,8 @@
 /**
  * Logger — collects and exports session data as JSON.
  *
- * Data format version 3.1 — 3-sensor Option B (LiDAR, Camera, Speedometer),
- * outcomes: crash, wobble, fine. No pedestrian, no ethics Q4.
+ * Data format version 4.0 — 3-sensor Option B (LiDAR, Camera, Speedometer).
+ * Toggle prediction/outcome strings may include near_miss once the UI exposes it.
  */
 
 const Logger = (() => {
@@ -21,12 +21,24 @@ const Logger = (() => {
 
   let lapCountsByPhase = {};
 
-  let demoQuality = { avgAbsCenterDev: 0, crashCount: 0 };
+  let demoQuality = {
+    avgAbsCenterDev: 0,
+    crashCount: 0,
+    demoRecordedSamples: 0,
+    demoSkippedSamples: 0,
+    demoFilterAcceptRate: null,
+  };
 
   let preAblationRanking  = null;
   let postAblationRanking = null;
 
   let reflectionData = null;
+
+  /** Incremented by logNearMiss; Part II may add per-event records. */
+  let nearMissCount = 0;
+
+  /** Set in endSession — feasibility / pilot metrics for the paper. */
+  let feasibilityMetrics = null;
 
   function start() {
     startTime = performance.now();
@@ -37,10 +49,18 @@ const Logger = (() => {
     crashes = [];
     events = [];
     lapCountsByPhase = {};
-    demoQuality = { avgAbsCenterDev: 0, crashCount: 0 };
+    demoQuality = {
+      avgAbsCenterDev: 0,
+      crashCount: 0,
+      demoRecordedSamples: 0,
+      demoSkippedSamples: 0,
+      demoFilterAcceptRate: null,
+    };
     preAblationRanking = null;
     postAblationRanking = null;
     reflectionData = null;
+    nearMissCount = 0;
+    feasibilityMetrics = null;
   }
 
   function setParticipant(id, cond) {
@@ -49,6 +69,14 @@ const Logger = (() => {
   }
 
   function setConfig(cfg) { config = cfg; }
+
+  function setFeasibilityMetrics(m) {
+    feasibilityMetrics = m;
+  }
+
+  function sessionElapsedMs() {
+    return performance.now() - startTime;
+  }
 
   function t() { return +(performance.now() - startTime).toFixed(1); }
 
@@ -109,8 +137,18 @@ const Logger = (() => {
     events.push({ t: t(), event: eventName, ...payload });
   }
 
-  function setDemoQuality(avgAbsDev, crashes) {
-    demoQuality = { avgAbsCenterDev: +avgAbsDev.toFixed(4), crashCount: crashes };
+  function setDemoQuality(avgAbsDev, crashes, recordedSamples, skippedSamples) {
+    const rec = recordedSamples != null ? recordedSamples : 0;
+    const skp = skippedSamples != null ? skippedSamples : 0;
+    const denom = rec + skp;
+    const rate = denom > 0 ? +(rec / denom).toFixed(4) : null;
+    demoQuality = {
+      avgAbsCenterDev: +avgAbsDev.toFixed(4),
+      crashCount: crashes,
+      demoRecordedSamples: rec,
+      demoSkippedSamples: skp,
+      demoFilterAcceptRate: rate,
+    };
   }
 
   function setPreAblationRanking(ranking)  { preAblationRanking = ranking; }
@@ -126,17 +164,24 @@ const Logger = (() => {
     };
   }
 
+  /** Part I stub: count only. Part II: append structured near-miss events. */
+  function logNearMiss(_carState, _toggleMask, _phase) {
+    nearMissCount++;
+  }
+
   function exportJSON() {
     return {
-      dataFormatVersion: '3.1',
+      dataFormatVersion: '4.0',
       participantId,
       condition,
       sessionStart: new Date().toISOString(),
+      nearMissCount,
       config: {
         ...config,
         sensorCount: 3,
       },
       demoQuality,
+      feasibility: feasibilityMetrics,
       preAblationRanking,
       postAblationRanking,
       reflection: reflectionData,
@@ -177,6 +222,9 @@ const Logger = (() => {
     setPreAblationRanking,
     setPostAblationRanking,
     logReflection,
+    logNearMiss,
+    setFeasibilityMetrics,
+    sessionElapsedMs,
     getLapCountForPhase,
     exportJSON,
     downloadJSON,

@@ -55,7 +55,7 @@ The AI drives using four inputs. Each one maps to a real self-driving car sensor
 | Sensor | What it measures | Real-world analogy | What happens when it's turned off |
 |---|---|---|---|
 | **LiDAR** | Distance to walls and obstacles | The spinning laser on top of a Waymo car | The AI can't see walls. It usually **crashes immediately**. |
-| **Camera** | How centered the car is on the road | Tesla's lane-keeping camera | The AI drifts off-center. It **wobbles gradually** toward the edge. |
+| **Camera** | How far ahead the road is clear (forward / dashcam-style cue) | A forward-facing camera sensing obstacles ahead | That straight-ahead distance cue is removed; the AI often **wobbles** or misjudges what's in front (side rays may still help if LiDAR is on). |
 | **Thermal** | Distance to a pedestrian on the track | Infrared cameras for nighttime pedestrian detection | The AI doesn't know the pedestrian is there. It may **almost hit them**. |
 | **Speedometer** | How fast the car is going | The dashboard speedometer | The AI drives slightly erratically. It **wobbles a little** but usually doesn't crash. |
 
