@@ -237,12 +237,6 @@ const GameManager = (() => {
       maxWarmupRetries: MAX_WARMUP_RETRIES,
       ablationRound1Ms: ROUND_1_DURATION_MS,
       ablationRound2Ms: ROUND_2_DURATION_MS,
-      nearMissRadius: null,
-      nearMissSlowDuration: null,
-      nearMissSpeedFactor: null,
-      pedestrianX: null,
-      pedestrianY: null,
-      cameraIsPedestrianProximity: true,
     });
 
     if (typeof UI.showControls === 'function') UI.showControls();
@@ -332,13 +326,6 @@ const GameManager = (() => {
     // Batch-train after all demos collected. Prevents catastrophic forgetting
     // that happens when samples arrive in sequential track order.
     KNN.train();
-    // [TEMP] Speed sensitivity test — validates H3 (Speedometer ablation)
-    const test = [...Sensors.compute(Car.getState())];
-    test[5] = 0.2;
-    const slow = KNN.predict(test).steering;
-    test[5] = 0.9;
-    const fast = KNN.predict(test).steering;
-    console.log('Speed sensitivity diff:', Math.abs(slow - fast).toFixed(4));
     await UI.showOverlay(
       'Nice driving!',
       `The AI learned from ${KNN.demoCount()} moments of your driving. Now watch it try to drive on its own.`,

@@ -756,7 +756,7 @@ canvas {
   margin-top: 14px;
 }
 
-/* ── Thermal sensor button color ── */
+/* ── Speedometer sensor button color ── */
 
 .sensor-btn[data-modality="2"].active {
   border-color: #facc15;
@@ -765,16 +765,4 @@ canvas {
 
 .sensor-btn[data-modality="2"]:hover:not(.locked) {
   border-color: #fde047;
-}
-
-/* ── Q4 ethics section ── */
-
-#reflectQ4Section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #334155;
-}
-
-#reflectQ4Section .refl-q {
-  color: #fb923c;
 }

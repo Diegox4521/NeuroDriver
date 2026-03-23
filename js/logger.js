@@ -2,7 +2,6 @@
  * Logger — collects and exports session data as JSON.
  *
  * Data format version 4.0 — 3-sensor Option B (LiDAR, Camera, Speedometer).
- * Toggle prediction/outcome strings may include near_miss once the UI exposes it.
  */
 
 const Logger = (() => {
@@ -34,8 +33,7 @@ const Logger = (() => {
 
   let reflectionData = null;
 
-  /** Incremented by logNearMiss; Part II may add per-event records. */
-  let nearMissCount = 0;
+
 
   /** Set in endSession — feasibility / pilot metrics for the paper. */
   let feasibilityMetrics = null;
@@ -59,7 +57,7 @@ const Logger = (() => {
     preAblationRanking = null;
     postAblationRanking = null;
     reflectionData = null;
-    nearMissCount = 0;
+
     feasibilityMetrics = null;
   }
 
@@ -164,10 +162,7 @@ const Logger = (() => {
     };
   }
 
-  /** Part I stub: count only. Part II: append structured near-miss events. */
-  function logNearMiss(_carState, _toggleMask, _phase) {
-    nearMissCount++;
-  }
+
 
   function exportJSON() {
     return {
@@ -175,7 +170,6 @@ const Logger = (() => {
       participantId,
       condition,
       sessionStart: new Date().toISOString(),
-      nearMissCount,
       config: {
         ...config,
         sensorCount: 3,
@@ -201,7 +195,7 @@ const Logger = (() => {
     const a = document.createElement('a');
     a.href = url;
     const pid = participantId || 'anon';
-    a.download = `glassbox_${pid}_${Date.now()}.json`;
+    a.download = `neurodriver_${pid}_${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -222,7 +216,7 @@ const Logger = (() => {
     setPreAblationRanking,
     setPostAblationRanking,
     logReflection,
-    logNearMiss,
+
     setFeasibilityMetrics,
     sessionElapsedMs,
     getLapCountForPhase,
