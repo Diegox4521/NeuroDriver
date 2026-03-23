@@ -22,6 +22,8 @@ This is the **current working design** after professor pilot feedback, sensor re
 - **Camera** = pure pedestrian proximity scalar (`Pedestrian.proximityValue`), **not** forward ray / lane geometry—no interference with chicane steering (MLP leans on LiDAR there; camera ~0 far from pedestrian).
 - **Near-miss** behavior and ethics narrative stay tied to **Camera off** + drift toward inner wall (see placement below).
 
+**Current shipped 6D (before Part II 7D):** `[leftFar, leftNear, rightNear, rightFar, camera_forward, speed]`. LiDAR toggle zeros indices **0–3** (four side rays); Camera zeros **4** (forward only); Speedometer zeros **5**. Implemented in `js/sensors.js`.
+
 ---
 
 ## Final sensor design

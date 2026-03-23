@@ -42,29 +42,6 @@ const Car = (() => {
       heading = safe.angle;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'X-Debug-Session-Id':'79a1f5'
-      },
-      body:JSON.stringify({
-        sessionId:'79a1f5',
-        runId:'pre-fix',
-        hypothesisId:'H2_spawn_offtrack_or_safepose_bad',
-        location:'car.js:reset',
-        message:'Car.reset applied',
-        data:{
-          pose,
-          originalOnTrack,
-          final:{x,y,heading},
-          finalOnTrack: Track.isOnTrack(x, y)
-        },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion
   }
 
   function update(dt) {

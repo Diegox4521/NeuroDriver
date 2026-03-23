@@ -12,22 +12,22 @@ const GameManager = (() => {
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
 
   const PHASE_DURATIONS = {
-    PRACTICE:         DEV_SHORT ? 5  : 30,
-    SENSOR_INTRO:     DEV_SHORT ? 5  : 30,
-    HUMAN_DEMO:       DEV_SHORT ? 20 : 120,
+    PRACTICE: DEV_SHORT ? 5 : 30,
+    SENSOR_INTRO: DEV_SHORT ? 5 : 30,
+    HUMAN_DEMO: DEV_SHORT ? 20 : 120,
     HUMAN_DEMO_EXTRA: DEV_SHORT ? 15 : 45,
-    AI_WARMUP:        45,
-    AI_ABLATION:      DEV_SHORT ? 30 : 180,
+    AI_WARMUP: 45,
+    AI_ABLATION: DEV_SHORT ? 30 : 180,
   };
 
   /** Wall-clock segment length inside AI_ABLATION (must sum to PHASE_DURATIONS.AI_ABLATION). */
   const ROUND_1_DURATION_MS = DEV_SHORT ? 15000 : 90000;
   const ROUND_2_DURATION_MS = DEV_SHORT ? 15000 : 90000;
 
-  let currentPhase   = 'INTRO';
+  let currentPhase = 'INTRO';
   let phaseStartTime = 0;
-  let phaseElapsed   = 0;
-  let paused         = false;
+  let phaseElapsed = 0;
+  let paused = false;
 
   const keys = {};
   const WASD_CODES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
@@ -53,22 +53,22 @@ const GameManager = (() => {
 
   function steerTargetFromKeys() {
     let target = 0;
-    if (keys['ArrowLeft']  || keys['KeyA']) target = -1;
-    if (keys['ArrowRight'] || keys['KeyD']) target =  1;
+    if (keys['ArrowLeft'] || keys['KeyA']) target = -1;
+    if (keys['ArrowRight'] || keys['KeyD']) target = 1;
     return target;
   }
   function throttleFromKeys() {
     return (keys['ArrowUp'] || keys['KeyW']) ? 1 : 0;
   }
 
-  let lastRecordTime     = 0;
-  const RECORD_INTERVAL  = 100;
+  let lastRecordTime = 0;
+  const RECORD_INTERVAL = 100;
 
-  let smoothedSteering   = 0;
+  let smoothedSteering = 0;
   let aiSmoothedSteering = 0;
-  const STEER_SMOOTH     = 0.18;
+  const STEER_SMOOTH = 0.18;
   /** Lower than STEER_SMOOTH: MLP steering jumps frame-to-frame; extra low-pass keeps the car stable. */
-  const AI_STEER_SMOOTH        = 0.085;
+  const AI_STEER_SMOOTH = 0.085;
   const AI_STEER_SMOOTH_NO_SPD = 0.12; // ablation: a bit snappier than normal, not as harsh as 0.3
 
   const STEER_WINDOW_SIZE = 3;
@@ -88,15 +88,15 @@ const GameManager = (() => {
 
   let spaceWasDown = false;
 
-  const OUTCOME_WINDOW_MS              = 7000;
-  const DEGRADED_THRESHOLD_CENTER_DEV  = 0.75;
-  const MIN_DEMO_COUNT                 = 100;
+  const OUTCOME_WINDOW_MS = 7000;
+  const DEGRADED_THRESHOLD_CENTER_DEV = 0.75;
+  const MIN_DEMO_COUNT = 100;
   /** Lower bar for warmup-retry segment (fresh buffer after KNN.reset). */
-  const MIN_DEMO_COUNT_EXTRA           = 60;
-  let outcomeWindowStart               = 0;
-  let outcomeWindowMaxAbsDeviation     = 0;
-  let crashedDuringOutcomeWindow       = false;
-  let outcomeResolver                  = null;
+  const MIN_DEMO_COUNT_EXTRA = 60;
+  let outcomeWindowStart = 0;
+  let outcomeWindowMaxAbsDeviation = 0;
+  let crashedDuringOutcomeWindow = false;
+  let outcomeResolver = null;
 
   let demoCenterDevSum = 0, demoCenterDevCount = 0, demoCrashCount = 0;
 
@@ -107,6 +107,10 @@ const GameManager = (() => {
   /** Frames that passed / failed shouldRecord() while moving on-track (for paper: filter acceptance rate). */
   let demoRecordedSamples = 0;
   let demoSkippedSamples = 0;
+
+  let demoSpeedSamples = [];
+  /** 90th-percentile normalized speed during human demo; caps AI throttle. */
+  let avgDemoSpeed = 0.7;
 
   const MAX_WARMUP_RETRIES = 3;
   let warmupRetryCount = 0;
@@ -167,25 +171,21 @@ const GameManager = (() => {
    * Speed index: last element (6D → [5], 7D → [6]) matches sensors.js layout.
    */
   function shouldRecord(sensors, labelSteering, prevSteering) {
-    const speedIdx = sensors.length - 1;
-    const forward   = sensors[2];
-    const leftNear  = sensors[1];
-    const rightNear = sensors[3];
-    const speed     = sensors[speedIdx];
+    const forward = sensors[4];
+    const leftNear = sensors[1];
+    const rightNear = sensors[2];
+    const speed = sensors[sensors.length - 1];
 
     if (speed < 0.05) return false;
-
-    const minWall = Math.min(leftNear, rightNear, forward);
-    if (minWall < 0.1) return false;
 
     const inCorner = forward < 0.75;
     if (inCorner) return true;
 
-    const steeringChange = Math.abs(labelSteering - prevSteering);
-    const stableControl = steeringChange < 0.5;
-    const centered = minWall > 0.2;
+    const minWall = Math.min(leftNear, rightNear, forward);
+    if (minWall < 0.1) return false;
 
-    return centered && stableControl;
+    const steeringChange = Math.abs(labelSteering - prevSteering);
+    return steeringChange < 0.5;
   }
 
   function refreshDemoInstruction() {
@@ -212,16 +212,16 @@ const GameManager = (() => {
     demoPhaseAccumSec = 0;
     ablationAICrashCount = 0;
     ablationStruggleNudgeShown = false;
-    
+
     currentPlayer = await UI.showLogin();
-    
+
     const progressKey = 'neuroDriver_progress_' + currentPlayer;
     if (!localStorage.getItem(progressKey)) {
-        localStorage.setItem(progressKey, JSON.stringify({
-            laps: 0,
-            highestDemoScore: 0,
-            phasesCompleted: []
-        }));
+      localStorage.setItem(progressKey, JSON.stringify({
+        laps: 0,
+        highestDemoScore: 0,
+        phasesCompleted: []
+      }));
     }
 
     Logger.start();
@@ -244,7 +244,7 @@ const GameManager = (() => {
       pedestrianY: null,
       cameraIsPedestrianProximity: true,
     });
-    
+
     if (typeof UI.showControls === 'function') UI.showControls();
     if (typeof UI.showDashcam === 'function') UI.showDashcam();
     await showIntro();
@@ -291,6 +291,7 @@ const GameManager = (() => {
     prevDemoSteering = 0;
     demoRecordedSamples = 0;
     demoSkippedSamples = 0;
+    demoSpeedSamples = [];
     drivingTipActive = false;
     UI.setPhaseLabel('Phase 1: Teach the AI');
     UI.showInstruction('Drive carefully — the AI is learning from you!');
@@ -324,9 +325,20 @@ const GameManager = (() => {
     resetCrashStreak();
     Sensors.resetToggles();
     for (let i = 0; i < 3; i++) UI.applySensorBtnState(i, true);
+    if (demoSpeedSamples.length > 0) {
+      const sorted = [...demoSpeedSamples].sort((a, b) => a - b);
+      avgDemoSpeed = sorted[Math.floor(sorted.length * 0.9)];
+    }
     // Batch-train after all demos collected. Prevents catastrophic forgetting
     // that happens when samples arrive in sequential track order.
     KNN.train();
+    // [TEMP] Speed sensitivity test — validates H3 (Speedometer ablation)
+    const test = [...Sensors.compute(Car.getState())];
+    test[5] = 0.2;
+    const slow = KNN.predict(test).steering;
+    test[5] = 0.9;
+    const fast = KNN.predict(test).steering;
+    console.log('Speed sensitivity diff:', Math.abs(slow - fast).toFixed(4));
     await UI.showOverlay(
       'Nice driving!',
       `The AI learned from ${KNN.demoCount()} moments of your driving. Now watch it try to drive on its own.`,
@@ -350,6 +362,7 @@ const GameManager = (() => {
     demoRecordedDots = [];
     demoRecordedSamples = 0;
     demoSkippedSamples = 0;
+    demoSpeedSamples = [];
     prevDemoSteering = 0;
     Logger.logEvent('demo_buffer_cleared_warmup_retry', {
       retryCount: warmupRetryCount,
@@ -580,9 +593,9 @@ const GameManager = (() => {
       updateAIDriving(now);
     }
 
-    const durationReached  = phaseElapsed >= phaseDuration();
-    const minDemoRequired  = currentPhase === 'HUMAN_DEMO_EXTRA' ? MIN_DEMO_COUNT_EXTRA : MIN_DEMO_COUNT;
-    const minSamplesMet    = (currentPhase !== 'HUMAN_DEMO' && currentPhase !== 'HUMAN_DEMO_EXTRA')
+    const durationReached = phaseElapsed >= phaseDuration();
+    const minDemoRequired = currentPhase === 'HUMAN_DEMO_EXTRA' ? MIN_DEMO_COUNT_EXTRA : MIN_DEMO_COUNT;
+    const minSamplesMet = (currentPhase !== 'HUMAN_DEMO' && currentPhase !== 'HUMAN_DEMO_EXTRA')
       || KNN.demoCount() >= minDemoRequired;
     const outcomeWindowActive = outcomeWindowStart > 0;
 
@@ -600,7 +613,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = false;
+  const DEV_AUTO_DEMO = true;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -611,11 +624,13 @@ const GameManager = (() => {
       const d2 = dx * dx + dy * dy;
       if (d2 < bestD2) { bestD2 = d2; bestIdx = i; }
     }
-    const target = centerline[(bestIdx + 20) % centerline.length];
+    // Short lookahead + high gain → sharper steering signal for training
+    const target = centerline[(bestIdx + 8) % centerline.length];
     let angleDiff = Math.atan2(target.y - car.y, target.x - car.x) - car.heading;
     angleDiff = ((angleDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
-    const targetSteer = Math.max(-1, Math.min(1, angleDiff * 0.7));
-    smoothedSteering += (targetSteer - smoothedSteering) * STEER_SMOOTH;
+    const targetSteer = Math.max(-1, Math.min(1, angleDiff * 1.5));
+    // Skip smoothing so the model gets raw, decisive steering labels
+    smoothedSteering = targetSteer;
     Car.setSteering(smoothedSteering);
     Car.setThrottle(0.85);
   }
@@ -633,7 +648,7 @@ const GameManager = (() => {
     }
 
     const carState = Car.getState();
-    const sensors  = Sensors.compute(carState);
+    const sensors = Sensors.compute(carState);
 
     // Rolling label smoothing (reduces single-frame spikes)
     steerWindowSum -= steerWindow[steerWindowIdx];
@@ -645,19 +660,20 @@ const GameManager = (() => {
 
     if (now - lastRecordTime > RECORD_INTERVAL) {
       if (carState.speed > 0.1 && Track.isOnTrack(carState.x, carState.y)) {
+        demoSpeedSamples.push(carState.normalizedSpeed);
         const dev = Track.centerDeviation(carState.x, carState.y);
 
         if (shouldRecord(sensors, labelSteering, prevDemoSteering)) {
           demoRecordedSamples++;
           KNN.addDemonstration(sensors, labelSteering);
-          lastDemoSensors  = [...sensors];
+          lastDemoSensors = [...sensors];
           lastDemoSteering = labelSteering;
           demoRecordedDots.push({ x: carState.x, y: carState.y });
         } else {
           demoSkippedSamples++;
         }
 
-        demoCenterDevSum   += Math.abs(dev);
+        demoCenterDevSum += Math.abs(dev);
         demoCenterDevCount += 1;
       }
       prevDemoSteering = labelSteering;
@@ -683,25 +699,34 @@ const GameManager = (() => {
   // ── AI driving ───────────────────────────────────────────────────────────
 
   function updateAIDriving(now) {
-    const carState      = Car.getState();
-    const sensorsRaw    = Sensors.rawValues(carState);   // unmasked, for throttle
+    const carState = Car.getState();
+    const sensorsRaw = Sensors.rawValues(carState);   // unmasked, for throttle
     const sensorsMasked = Sensors.compute(carState);     // masked by toggles, for steering
 
-    const result    = KNN.predict(sensorsMasked);
+    const result = KNN.predict(sensorsMasked);
     const resultRaw = KNN.predict(sensorsRaw);
     lastAIResult = result;
 
-    // Steering: MLP output → smooth → clamp. Full ±1 in chicanes the old ±0.8 cap caused understeer.
     const steer = Math.max(-1, Math.min(1, result.steering));
-    // Use the exact same steering physics as the human so the simulation is strictly fair.
-    aiSmoothedSteering += (steer - aiSmoothedSteering) * STEER_SMOOTH;
-    aiSmoothedSteering  = Math.max(-0.8, Math.min(0.8, aiSmoothedSteering));
+    const spdOff = !Sensors.getToggleMask()[2];
+    const smoothFactor = spdOff ? AI_STEER_SMOOTH_NO_SPD : AI_STEER_SMOOTH;
+    aiSmoothedSteering += (steer - aiSmoothedSteering) * smoothFactor;
+    aiSmoothedSteering = Math.max(-1.0, Math.min(1.0, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);
 
-    // Throttle:
-    // Drive at the exact same full throttle the human used, so the speed sensor matches the training data.
-    const lidarMin = Math.min(sensorsRaw[0], sensorsRaw[1], sensorsRaw[2], sensorsRaw[3], sensorsRaw[4]);
-    const throttle = (resultRaw.confidence > 0.5 && lidarMin > 0.35) ? 1.0 : 0.4;
+    // Proportional speed controller: targets demo speed, scales by forward road clearance.
+    // Steering is learned; speed is regulated. Uses raw sensors so ablation doesn't affect throttle.
+    const forward = sensorsRaw[4];
+    const turnFactor = 1 - forward;
+    const curveSlowdown = 1 - 0.6 * Math.pow(turnFactor, 1.5);
+    const targetSpeed = avgDemoSpeed * curveSlowdown;
+
+    const speedError = targetSpeed - carState.normalizedSpeed;
+    let throttle = Math.max(0, Math.min(1, speedError * 5));
+
+    const tooFast = carState.normalizedSpeed > avgDemoSpeed + 0.15;
+    if (tooFast) throttle = 0;
+
     Car.setThrottle(throttle);
 
     UI.updateConfidence(result.confidence);
@@ -758,10 +783,10 @@ const GameManager = (() => {
 
   function advancePhase() {
     switch (currentPhase) {
-      case 'PRACTICE':        beginSensorIntro(); break;
-      case 'HUMAN_DEMO':      flushDemoQuality(); beginPreRanking(); break;
+      case 'PRACTICE': beginSensorIntro(); break;
+      case 'HUMAN_DEMO': flushDemoQuality(); beginPreRanking(); break;
       case 'HUMAN_DEMO_EXTRA': flushDemoQuality(); beginAIWarmup(); break;
-      case 'AI_ABLATION':     beginPostRanking(); break;
+      case 'AI_ABLATION': beginPostRanking(); break;
       case 'AI_WARMUP': {
         const laps = Logger.getLapCountForPhase('AI_WARMUP');
         if (laps === 0 && warmupRetryCount < MAX_WARMUP_RETRIES) {
@@ -786,7 +811,7 @@ const GameManager = (() => {
 
     const sensorName = Sensors.SENSOR_NAMES[sensorIndex];
     const confBefore = lastAIResult ? lastAIResult.confidence : null;
-    const lapProg    = Track.lapProgress(Car.getState().x, Car.getState().y);
+    const lapProg = Track.lapProgress(Car.getState().x, Car.getState().y);
 
     let predictionChoice = null;
 
@@ -804,7 +829,7 @@ const GameManager = (() => {
     UI.applySensorBtnState(sensorIndex, newState);
 
     const newSensors = Sensors.compute(Car.getState());
-    const confAfter  = KNN.predict(newSensors).confidence;
+    const confAfter = KNN.predict(newSensors).confidence;
     UI.updateConfidence(confAfter);
 
     paused = false;
@@ -815,7 +840,7 @@ const GameManager = (() => {
       crashedDuringOutcomeWindow = false;
 
       outcomeResolver = () => {
-        const stateNow  = Car.getState();
+        const stateNow = Car.getState();
         let outcome;
         if (stateNow.crashed || crashedDuringOutcomeWindow) {
           outcome = 'crash';

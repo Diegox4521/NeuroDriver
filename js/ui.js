@@ -163,17 +163,13 @@ const UI = (() => {
     return new Promise(resolve => {
       const elOverlay = overlay();
       const elBtn = overlayBtn();
-      // #region agent log
-      fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966069'},body:JSON.stringify({sessionId:'966069',location:'ui.js:showOverlay',message:'showOverlay_called',data:{overlayExists:!!elOverlay,btnExists:!!elBtn,btnId:elBtn?elBtn.id:null},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
+
       overlayTitle().textContent = title;
       overlayText().textContent = text;
       elBtn.textContent = btnLabel;
       elOverlay.classList.remove('hidden');
       elBtn.onclick = () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'966069'},body:JSON.stringify({sessionId:'966069',location:'ui.js:overlayBtn.onclick',message:'overlay_btn_clicked',data:{},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
+
         elOverlay.classList.add('hidden');
         resolve();
       };

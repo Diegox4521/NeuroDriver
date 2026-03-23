@@ -157,30 +157,6 @@ const Track = (() => {
     const next = centerline[2];
     const angle = Math.atan2(next.y - p.y, next.x - p.x);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7556/ingest/bea9ea57-660f-44ed-a937-8aae4cd55afd',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'X-Debug-Session-Id':'79a1f5'
-      },
-      body:JSON.stringify({
-        sessionId:'79a1f5',
-        runId:'pre-fix',
-        hypothesisId:'H1_startPose_offtrack',
-        location:'track.js:startPose',
-        message:'startPose computed',
-        data:{
-          p,
-          next,
-          angle,
-          isOnTrack: isOnTrack(p.x, p.y)
-        },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion
-
     return { x: p.x, y: p.y, angle };
   }
 

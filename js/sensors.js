@@ -1,17 +1,17 @@
 /**
- * Sensors — five LiDAR raycasts + speedometer for the MLP.
+ * Sensors — four LiDAR side rays + forward camera ray + speedometer for the MLP.
  *
  * Internal 6-element feature vector:
- *   [0] leftFar    — ray at -60° / RAY_MAX_DIST
- *   [1] leftNear   — ray at -30° / RAY_MAX_DIST
- *   [2] forward    — ray at   0° / RAY_MAX_DIST
- *   [3] rightNear  — ray at +30° / RAY_MAX_DIST
- *   [4] rightFar   — ray at +60° / RAY_MAX_DIST
+ *   [0] leftFar    — ray at -60° / RAY_MAX_DIST  (LiDAR)
+ *   [1] leftNear   — ray at -30° / RAY_MAX_DIST  (LiDAR)
+ *   [2] rightNear  — ray at +30° / RAY_MAX_DIST  (LiDAR)
+ *   [3] rightFar   — ray at +60° / RAY_MAX_DIST  (LiDAR)
+ *   [4] forward    — ray at   0° / RAY_MAX_DIST  (Camera — cone only, no LiDAR stroke)
  *   [5] speed      — normalizedSpeed
  *
  * Student-facing toggles (3):
- *   LiDAR       [0] — zeroes ALL five ray channels (0-4)
- *   Camera      [1] — zeroes forward ray only (index 2)
+ *   LiDAR       [0] — zeroes side rays only (indices 0–3)
+ *   Camera      [1] — zeroes forward ray only (index 4)
  *   Speedometer [2] — zeroes speed channel (index 5)
  */
 
@@ -22,13 +22,16 @@ const Sensors = (() => {
   const SENSOR_NAMES        = ['LiDAR', 'Camera', 'Speedometer'];
   const SENSOR_COLORS       = ['#22d3ee', '#34d399', '#facc15'];
   const SENSOR_DESCRIPTIONS = [
-    'Fires lasers to measure distance to walls',
+    'Fires side lasers to measure distance to walls',
     'Reads how far ahead the road is clear',
     'Measures how fast the car is moving',
   ];
 
   let toggleMask = [true, true, true];
-  let lastRays   = [];
+  /** Four side rays for LiDAR drawing and min-distance HUD. */
+  let lastLidarRays = [];
+  /** Forward 0° ray — camera cone only; not drawn as a cyan LiDAR beam. */
+  let lastForwardRay = null;
   let lastValues = [0, 0, 0];
 
   // ── Ray casting ──────────────────────────────────────────────────────────
@@ -64,24 +67,24 @@ const Sensors = (() => {
   function buildRaw(x, y, heading, normalizedSpeed) {
     const lf = castRay(x, y, heading - Math.PI / 3);   // -60°
     const ln = castRay(x, y, heading - Math.PI / 6);   // -30°
-    const fw = castRay(x, y, heading);                 //   0°
+    const fwd = castRay(x, y, heading);                 //   0° — Camera
     const rn = castRay(x, y, heading + Math.PI / 6);   // +30°
     const rf = castRay(x, y, heading + Math.PI / 3);   // +60°
 
-    lastRays = [
+    lastLidarRays = [
       { ox: x, oy: y, hx: lf.hitX, hy: lf.hitY, dist: lf.dist },
       { ox: x, oy: y, hx: ln.hitX, hy: ln.hitY, dist: ln.dist },
-      { ox: x, oy: y, hx: fw.hitX, hy: fw.hitY, dist: fw.dist },
       { ox: x, oy: y, hx: rn.hitX, hy: rn.hitY, dist: rn.dist },
       { ox: x, oy: y, hx: rf.hitX, hy: rf.hitY, dist: rf.dist },
     ];
+    lastForwardRay = { ox: x, oy: y, hx: fwd.hitX, hy: fwd.hitY, dist: fwd.dist };
 
     return [
       lf.normalized,
       ln.normalized,
-      fw.normalized,
       rn.normalized,
       rf.normalized,
+      fwd.normalized,
       normalizedSpeed,
     ];
   }
@@ -89,15 +92,12 @@ const Sensors = (() => {
   function applyMask(raw) {
     const v = [...raw];
     if (!toggleMask[0]) {
-      // LiDAR off → zero ALL five ray channels
-      v[0] = v[1] = v[2] = v[3] = v[4] = 0;
+      v[0] = v[1] = v[2] = v[3] = 0;
     }
     if (!toggleMask[1]) {
-      // Camera off → zero forward ray only
-      v[2] = 0;
+      v[4] = 0;
     }
     if (!toggleMask[2]) {
-      // Speedometer off → zero speed channel (true ablation)
       v[5] = 0;
     }
     return v;
@@ -108,9 +108,8 @@ const Sensors = (() => {
     const raw = buildRaw(x, y, heading, normalizedSpeed);
     const masked = applyMask(raw);
 
-    // Mini-HUD: show 3 conceptual sensor values
-    const lidarMin = Math.min(raw[0], raw[1], raw[2], raw[3], raw[4]);
-    const display  = [lidarMin, raw[2], raw[5]];
+    const lidarMin = Math.min(raw[0], raw[1], raw[2], raw[3]);
+    const display  = [lidarMin, raw[4], raw[5]];
     lastValues = display.map((v, i) => toggleMask[i] ? v : 0);
 
     return masked;
@@ -118,7 +117,7 @@ const Sensors = (() => {
 
   function rawValues(carState) {
     const { x, y, heading, normalizedSpeed } = carState;
-    return applyMask(buildRaw(x, y, heading, normalizedSpeed));
+    return buildRaw(x, y, heading, normalizedSpeed);
   }
 
   // Dashcam pseudo-3D raycaster (high density)
@@ -130,7 +129,6 @@ const Sensors = (() => {
     for (let i = 0; i < numSlices; i++) {
       const a = startAngle + i * angleStep;
       const res = castRay(carState.x, carState.y, a);
-      // Cosine correction to prevent physical fisheye lens distortion
       const correctedDist = res.dist * Math.cos(a - carState.heading);
       arr.push(Math.min(1.0, correctedDist / RAY_MAX_DIST));
     }
@@ -140,53 +138,50 @@ const Sensors = (() => {
   // ── Drawing ──────────────────────────────────────────────────────────────
 
   function draw(ctx) {
-    if (lastRays.length === 0) return;
+    if (!lastForwardRay || lastLidarRays.length === 0) return;
 
     const lidarActive  = toggleMask[0];
     const cameraActive = toggleMask[1];
     const speedActive  = toggleMask[2];
-    const rForward     = lastRays[2]; // the 0-degree ray
+    const rForward     = lastForwardRay;
     const carX = rForward.ox;
     const carY = rForward.oy;
 
-    // --- Camera Overlay (Vision Cone) ---
     if (cameraActive) {
       ctx.save();
       const dist = rForward.dist;
       const angle = Math.atan2(rForward.hy - rForward.oy, rForward.hx - rForward.ox);
-      const coneAngle = Math.PI / 6; // 30 degrees half-angle
-      
+      const coneAngle = Math.PI / 6;
+
       ctx.beginPath();
       ctx.moveTo(carX, carY);
       ctx.arc(carX, carY, dist, angle - coneAngle, angle + coneAngle);
       ctx.lineTo(carX, carY);
-      
+
       const grad = ctx.createRadialGradient(carX, carY, 0, carX, carY, dist);
-      grad.addColorStop(0, 'rgba(52, 211, 153, 0.25)'); // #34d399
+      grad.addColorStop(0, 'rgba(52, 211, 153, 0.25)');
       grad.addColorStop(1, 'rgba(52, 211, 153, 0)');
-      
+
       ctx.fillStyle = grad;
       ctx.fill();
       ctx.restore();
     }
 
-    // --- LiDAR Rays ---
     ctx.save();
     if (lidarActive) ctx.globalCompositeOperation = 'screen';
-    
-    for (let i = 0; i < lastRays.length; i++) {
-      const r = lastRays[i];
+
+    for (let i = 0; i < lastLidarRays.length; i++) {
+      const r = lastLidarRays[i];
       ctx.beginPath();
       ctx.moveTo(r.ox, r.oy);
       ctx.lineTo(r.hx, r.hy);
-      
+
       if (lidarActive) {
         const isSafe = (r.dist / RAY_MAX_DIST) > 0.5;
         ctx.strokeStyle = isSafe ? '#22d3ee' : '#ef4444';
         ctx.lineWidth = 2;
         ctx.stroke();
-        
-        // Draw hit point dot
+
         ctx.beginPath();
         ctx.arc(r.hx, r.hy, 3, 0, Math.PI * 2);
         ctx.fillStyle = ctx.strokeStyle;
@@ -203,12 +198,11 @@ const Sensors = (() => {
     }
     ctx.restore();
 
-    // --- Speedometer Text ---
     if (speedActive) {
-      // Access the normalized speed from the last MLP vector (index 5)
-      // or directly from lastValues array (index 2 corresponds to speed value)
-      const speedVal = lastValues[2]; 
-      const mph = Math.round(speedVal * 120); // arbitrary max MPH mapping
+      const speedVal = lastValues[2];
+      // Proportional MPH for kids (relatable unit); max maps to normalized full speed, not a real-world claim.
+      const MAX_DISPLAY_MPH = 65;
+      const mph = Math.round(Math.max(0, Math.min(1, speedVal)) * MAX_DISPLAY_MPH);
       ctx.save();
       ctx.font = 'bold 12px "Courier New", monospace';
       ctx.fillStyle = '#facc15';

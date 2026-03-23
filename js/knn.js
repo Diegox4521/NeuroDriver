@@ -8,16 +8,16 @@
  *   reset()
  *   demoCount()
  *
- * Input: 6D — [leftFar, leftNear, forward, rightNear, rightFar, speed] in [0,1]
+ * Input: 6D — [leftFar, leftNear, rightNear, rightFar, camera_forward, speed] in [0,1]
  * Output: steering in [-1, 1], confidence in [0, 1]
  */
 
 const KNN = (() => {
 
-  const INPUT_SIZE   = 6;
-  const HIDDEN_SIZE  = 64;
+  const INPUT_SIZE = 6;
+  const HIDDEN_SIZE = 64;
   const LEARNING_RATE = 0.005;
-  const EPOCHS       = 80;
+  const EPOCHS = 80;
 
   let demonstrations = [];
   let W1, b1, W2, b2;
@@ -54,7 +54,7 @@ const KNN = (() => {
 
   function trainOne(x, target) {
     const { h, out, steering } = forward(x);
-    const dL   = steering - target;
+    const dL = steering - target;
     const dOut = dL * (1 - steering * steering);
     const oldW2 = [...W2];
     for (let j = 0; j < HIDDEN_SIZE; j++) {
@@ -73,6 +73,11 @@ const KNN = (() => {
 
   function train() {
     if (demonstrations.length === 0) return;
+    // Dataset composition summary (research diagnostics)
+    const straight = demonstrations.filter(d => Math.abs(d.steering) <= 0.15).length;
+    const moderate = demonstrations.filter(d => Math.abs(d.steering) > 0.15 && Math.abs(d.steering) <= 0.4).length;
+    const sharp    = demonstrations.filter(d => Math.abs(d.steering) > 0.4).length;
+    console.log(`[KNN] Training on ${demonstrations.length} samples: ${straight} straight, ${moderate} moderate turns, ${sharp} sharp turns`);
     for (let epoch = 0; epoch < EPOCHS; epoch++) {
       const data = [...demonstrations];
       for (let i = data.length - 1; i > 0; i--) {
@@ -80,7 +85,10 @@ const KNN = (() => {
         [data[i], data[j]] = [data[j], data[i]];
       }
       for (const d of data) {
-        const noisy = d.sensors.map(v => v + (Math.random() - 0.5) * 0.02);
+        const noisy = d.sensors.map(v => {
+          const n = v + (Math.random() - 0.5) * 0.08;
+          return Math.max(0, Math.min(1, n));
+        });
         trainOne(noisy, d.steering);
       }
     }
@@ -90,7 +98,18 @@ const KNN = (() => {
     const target = Math.max(-1, Math.min(1, steering));
     const x = [...sensors];
     demonstrations.push({ sensors: x, steering: target });
-    if (Math.abs(target) > 0.4) {
+    // Graduated oversampling: moderate turns get 1 extra, sharp turns get 2 extra.
+    // Prevents straight-driving bias that causes the AI to fail on curves.
+    const absSteering = Math.abs(target);
+    if (absSteering > 0.4) {
+      demonstrations.push({ sensors: [...x], steering: target });
+      demonstrations.push({ sensors: [...x], steering: target });
+    } else if (absSteering > 0.15) {
+      demonstrations.push({ sensors: [...x], steering: target });
+    }
+    // Near-wall oversampling: teaches "when close to wall → turn NOW"
+    const nearWall = x[1] < 0.3 || x[2] < 0.3;
+    if (nearWall) {
       demonstrations.push({ sensors: [...x], steering: target });
     }
   }
@@ -101,8 +120,10 @@ const KNN = (() => {
 
   function predict(sensorVector) {
     if (demonstrations.length === 0) return { steering: 0, confidence: 0 };
-    const x = [...sensorVector];
-    const { steering } = forward(x);
+    const x = sensorVector.map(v => Math.max(0, Math.min(1, v)));
+    const { steering: rawSteering } = forward(x);
+    // Scale up to help the AI commit to turns instead of under-correcting
+    const steering = Math.max(-1, Math.min(1, rawSteering * 1.2));
     const K = Math.min(3, demonstrations.length);
     const dists = demonstrations.map(d => {
       let s = 0;
