@@ -249,7 +249,7 @@ const GameManager = (() => {
     Logger.logPhase('INTRO');
     await UI.showOverlay(
       'Welcome!',
-      'You are going to teach an AI how to drive. First, practice driving the car with the arrow keys or WASD. Then the AI will watch and learn from you.',
+      'You are going to teach an AI how to drive. First, practice driving the car with the arrow keys. Then the AI will watch and learn from you.',
       'Start Practice'
     );
     beginPractice();
@@ -261,7 +261,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     spaceWasDown = false;
     UI.setPhaseLabel('Practice: Learn the Controls');
-    UI.showInstruction('Practice driving! Arrow keys or WASD: W/↑ accelerate, A/D or ← → steer. Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready.');
+    UI.showInstruction('Practice driving! Use ↑ to accelerate and ← → to steer. Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready.');
     UI.hideToggles();
     UI.hideConfidence();
     Car.respawn();

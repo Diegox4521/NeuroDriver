@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Driver — Glass Box</title>
+  <title>NeuroDriver</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%2322d3ee' width='32' height='32' rx='4'/></svg>">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -52,11 +52,25 @@
       <div id="loginContent">
         <h2>NEURO DRIVER</h2>
         <p style="color: #fbbf24; font-weight: bold; font-size: 16px; margin-bottom: 6px;">WELCOME TO THE SIMULATION</p>
-        <p style="margin-bottom: 24px; line-height: 1.5;"><strong>How to play:</strong> Use arrow keys or WASD to drive. Avoid the walls, keep your speed up, and teach the AI to mimic your perfect laps!</p>
-        <p style="font-size: 13px; color: #94a3b8; font-style: italic; margin-bottom: 12px;">Enter your First Name and Last Initial to track your progress.</p>
+        <p style="margin-bottom: 16px; line-height: 1.6; color: #cbd5e1;">You're about to teach an AI how to drive — then experiment on it.</p>
+
+        <div style="text-align: left; margin-bottom: 16px; line-height: 1.7;">
+          <p style="font-weight: bold; color: #e2e8f0; margin-bottom: 4px;">How it works:</p>
+          <p style="color: #94a3b8; margin: 0;">• First, drive the car to teach the AI your driving style</p>
+          <p style="color: #94a3b8; margin: 0;">• Then watch the AI drive on its own</p>
+          <p style="color: #94a3b8; margin: 0;">• Finally, turn off its sensors to see what breaks</p>
+        </div>
+
+        <div style="text-align: left; margin-bottom: 16px; line-height: 1.7;">
+          <p style="font-weight: bold; color: #e2e8f0; margin-bottom: 4px;">How to drive:</p>
+          <p style="color: #94a3b8; margin: 0;">Arrow keys</p>
+          <p style="color: #94a3b8; margin: 0;">Drive carefully, especially around corners — the AI learns from you</p>
+        </div>
+
+        <p style="font-size: 13px; color: #94a3b8; font-style: italic; margin-bottom: 12px;">Enter your First Name and Last Initial to begin.</p>
         <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 24px;">
           <input type="text" id="loginFirstName" placeholder="First Name" maxlength="20" autocomplete="off" style="flex: 2;" />
-          <input type="text" id="loginLastInitial" placeholder="Last Initial" maxlength="2" autocomplete="off" style="flex: 1; text-align: center;" />
+          <input type="text" id="loginLastInitial" placeholder="Last Initial" maxlength="1" autocomplete="off" style="flex: 1; text-align: center;" />
         </div>
         <p id="loginError" style="color: #ef4444; font-size: 13px; margin-bottom: 12px; display: none;">Please provide both a First Name and Last Initial!</p>
         <button id="loginBtn" class="primary-btn">Start Engine</button>
