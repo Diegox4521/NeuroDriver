@@ -59,8 +59,8 @@ canvas {
 }
 
 #timer {
-  font-size: 13px;
-  color: #64748b;
+  font-size: 15px;
+  color: #94a3b8;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

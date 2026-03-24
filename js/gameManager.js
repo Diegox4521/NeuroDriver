@@ -743,7 +743,7 @@ const GameManager = (() => {
     if (currentPhase !== 'HUMAN_DEMO' && currentPhase !== 'HUMAN_DEMO_EXTRA') return;
     if (!demoRecordedDots.length) return;
     ctx.save();
-    ctx.fillStyle = 'rgba(244, 114, 182, 0.55)';
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.7)'; // Brighter cyber-blue
     const n = demoRecordedDots.length;
     for (let i = Math.max(0, n - 6000); i < n; i++) {
       const p = demoRecordedDots[i];
