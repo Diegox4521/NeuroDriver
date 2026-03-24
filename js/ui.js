@@ -276,23 +276,25 @@ const UI = (() => {
           const isFirst = i === 0;
           const isLast = i === ranking.length - 1;
 
-          const up = document.createElement('button');
-          up.type = 'button';
-          up.className = 'rank-move-btn';
-          up.setAttribute('aria-label', 'Move up');
-          up.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>';
-          up.onclick = () => moveRank(i, -1);
-          if (isFirst) up.disabled = true;
-          moves.appendChild(up);
+          if (!isFirst) {
+            const up = document.createElement('button');
+            up.type = 'button';
+            up.className = 'rank-move-btn';
+            up.setAttribute('aria-label', 'Move up');
+            up.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>';
+            up.onclick = () => moveRank(i, -1);
+            moves.appendChild(up);
+          }
 
-          const down = document.createElement('button');
-          down.type = 'button';
-          down.className = 'rank-move-btn';
-          down.setAttribute('aria-label', 'Move down');
-          down.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
-          down.onclick = () => moveRank(i, 1);
-          if (isLast) down.disabled = true;
-          moves.appendChild(down);
+          if (!isLast) {
+            const down = document.createElement('button');
+            down.type = 'button';
+            down.className = 'rank-move-btn';
+            down.setAttribute('aria-label', 'Move down');
+            down.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+            down.onclick = () => moveRank(i, 1);
+            moves.appendChild(down);
+          }
 
           row.appendChild(ordinalBadge);
           row.appendChild(label);

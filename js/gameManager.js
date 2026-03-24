@@ -10,7 +10,7 @@
 const GameManager = (() => {
 
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
-  const DEV_SKIP_PRACTICE = false;
+  const DEV_SKIP_PRACTICE = true;
 
   const PHASE_DURATIONS = {
     PRACTICE: DEV_SHORT ? 5 : 30,
@@ -443,8 +443,8 @@ const GameManager = (() => {
     Logger.downloadJSON();
 
     UI.showOverlay(
-      'All done!', 
-      'Thank you! Your data has been securely saved to the lab server. Please follow the instructions to complete your post-survey.', 
+      'All done!',
+      'Thank you! Your data has been securely saved to the lab server. Please follow the instructions to complete your post-survey.',
       'Finish & Reset'
     ).then(() => {
       // Reload the page to prep the computer for the next middle schooler
@@ -601,7 +601,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = false;
+  const DEV_AUTO_DEMO = true;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -717,7 +717,7 @@ const GameManager = (() => {
 
     Car.setThrottle(throttle);
 
-    
+
 
     if (outcomeWindowStart > 0 && (now - outcomeWindowStart) < OUTCOME_WINDOW_MS) {
       const dev = Track.centerDeviation(carState.x, carState.y);
