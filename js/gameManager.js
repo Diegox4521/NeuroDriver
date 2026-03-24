@@ -10,7 +10,7 @@
 const GameManager = (() => {
 
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
-  const DEV_SKIP_PRACTICE = true;
+  const DEV_SKIP_PRACTICE = false;
 
   const PHASE_DURATIONS = {
     PRACTICE: DEV_SHORT ? 5 : 30,
@@ -601,7 +601,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = true;
+  const DEV_AUTO_DEMO = false;
 
   function autoDemoController() {
     const car = Car.getState();
