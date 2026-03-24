@@ -600,7 +600,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = true;
+  const DEV_AUTO_DEMO = false;
 
   function autoDemoController() {
     const car = Car.getState();
