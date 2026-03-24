@@ -230,21 +230,26 @@ const UI = (() => {
       const countdownEl = $('#sensorIntroCountdown');
       modal.classList.remove('hidden');
 
-      let secondsLeft = 30;
-      countdownEl.textContent = `Auto-continues in ${secondsLeft}s`;
+      // Lock the button for 8 seconds so participants read the descriptions
+      const LOCK_SECONDS = 8;
+      let secondsLeft = LOCK_SECONDS;
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+      countdownEl.textContent = '';
 
       const interval = setInterval(() => {
         secondsLeft--;
         if (secondsLeft <= 0) {
           clearInterval(interval);
-          modal.classList.add('hidden');
-          resolve();
-        } else {
-          countdownEl.textContent = `Auto-continues in ${secondsLeft}s`;
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.style.cursor = 'pointer';
         }
       }, 1000);
 
       btn.onclick = () => {
+        if (btn.disabled) return;
         clearInterval(interval);
         modal.classList.add('hidden');
         resolve();
