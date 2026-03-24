@@ -35,58 +35,7 @@ const UI = (() => {
 
   let onToggleCallback = null;
 
-  // ── Draggable Utility ──
-  function makeDraggable(el) {
-    if (!el) return;
-    let isDragging = false, startX, startY, origX, origY;
-    
-    el.style.cursor = 'grab';
-    el.style.pointerEvents = 'auto'; // ensure it can be grabbed
-
-    el.addEventListener('mousedown', e => {
-      // Don't drag if clicking a button/input inside
-      if (e.target.closest('button') || ['INPUT', 'SELECT'].includes(e.target.tagName)) return;
-      isDragging = true;
-      el.style.cursor = 'grabbing';
-      startX = e.clientX;
-      startY = e.clientY;
-      const rect = el.getBoundingClientRect();
-      origX = rect.left;
-      origY = rect.top;
-      
-      // Detach from responsive anchors (left/right/translate) so dragging follows absolute cursor
-      el.style.right = 'auto';
-      el.style.bottom = 'auto';
-      el.style.left = origX + 'px';
-      el.style.top = origY + 'px';
-      el.style.transform = 'none'; 
-      e.preventDefault();
-    });
-
-    window.addEventListener('mousemove', e => {
-      if (!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      el.style.left = (origX + dx) + 'px';
-      el.style.top = (origY + dy) + 'px';
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (isDragging) {
-        isDragging = false;
-        el.style.cursor = 'grab';
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    makeDraggable($('#hud'));
-    makeDraggable($('#miniHud'));
-    makeDraggable($('#controlsHud'));
-    makeDraggable($('#dashcamHud'));
-    makeDraggable($('#experimentBanner'));
-    makeDraggable($('#instructions'));
-  });
+  // Panels are fixed-position for consistent layout across participants
 
   // ── Sensor toggle buttons ──
 
