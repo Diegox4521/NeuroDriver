@@ -183,13 +183,14 @@ const Track = (() => {
   function draw(ctx) {
     // Road surface
     ctx.beginPath();
-    for (let i = 0; i < innerWall.length; i++) {
-      const seg = innerWall[i];
+    for (let i = 0; i <= innerWall.length; i++) {
+      const seg = innerWall[i % innerWall.length];
       if (i === 0) ctx.moveTo(seg.x1, seg.y1);
       else ctx.lineTo(seg.x1, seg.y1);
     }
-    for (let i = outerWall.length - 1; i >= 0; i--) {
-      ctx.lineTo(outerWall[i].x1, outerWall[i].y1);
+    for (let i = outerWall.length; i >= 0; i--) {
+      const seg = outerWall[i % outerWall.length];
+      ctx.lineTo(seg.x1, seg.y1);
     }
     ctx.closePath();
     ctx.fillStyle = '#334155'; // Asphalt

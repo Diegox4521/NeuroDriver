@@ -461,8 +461,7 @@ const UI = (() => {
   function setTimer(text)        { timerEl().textContent = text; }
   function showToggles()         { sensorTogglesDiv().classList.remove('hidden'); }
   function hideToggles()         { sensorTogglesDiv().classList.add('hidden'); }
-  function showConfidence()      { confidenceContainer().classList.remove('hidden'); }
-  function hideConfidence()      { confidenceContainer().classList.add('hidden'); }
+
 
   function setDemoCount(n, minRequired) {
     const el = demoCountEl();
@@ -499,8 +498,6 @@ const UI = (() => {
     setTimer,
     showToggles,
     hideToggles,
-    showConfidence,
-    hideConfidence,
     setDemoCount,
     showDemoCount,
     hideDemoCount,

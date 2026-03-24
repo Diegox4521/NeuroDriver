@@ -264,7 +264,6 @@ const GameManager = (() => {
     UI.setPhaseLabel('Practice: Learn the Controls');
     UI.showInstruction('Practice driving! Use ↑ to accelerate and ← → to steer.');
     UI.hideToggles();
-    UI.hideConfidence();
     Car.respawn();
   }
 
@@ -293,7 +292,6 @@ const GameManager = (() => {
     UI.showDemoCount();
     UI.setDemoCount(0, MIN_DEMO_COUNT);
     UI.hideToggles();
-    UI.hideConfidence();
     KNN.reset();
     demoRecordedDots = [];
     Car.respawn();
@@ -337,7 +335,6 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 2: AI Driving');
     UI.hideDemoCount();
-    UI.showConfidence();
     aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
@@ -369,7 +366,7 @@ const GameManager = (() => {
     }
     UI.showDemoCount();
     UI.setDemoCount(0, MIN_DEMO_COUNT_EXTRA);
-    UI.hideToggles(); UI.hideConfidence();
+    UI.hideToggles();
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
   }
@@ -390,7 +387,7 @@ const GameManager = (() => {
     ablationStruggleNudgeShown = false;
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 3: Sensor Experiments');
-    UI.showToggles(); UI.showConfidence();
+    UI.showToggles();
     ablationRound = 1;
     ablationRound2Announced = false;
     UI.unlockSensor(2);
@@ -405,7 +402,7 @@ const GameManager = (() => {
     currentPhase = 'POST_ABLATION_RANKING';
     Logger.logPhase('POST_ABLATION_RANKING');
     paused = true;
-    UI.hideToggles(); UI.hideConfidence(); UI.hideBanner();
+    UI.hideToggles(); UI.hideBanner();
     UI.unlockSensor(2);
     Sensors.resetToggles();
     const ranking = await UI.showRanking(
@@ -447,7 +444,7 @@ const GameManager = (() => {
       ablationStruggleNudgeShown,
     });
     UI.setPhaseLabel('Session Complete');
-    UI.hideToggles(); UI.hideConfidence(); UI.hideInstruction(); UI.hideBanner();
+    UI.hideToggles(); UI.hideInstruction(); UI.hideBanner();
     UI.showOverlay('All done!', 'Thank you for teaching the AI. Your session data is being saved.', 'Download Data')
       .then(() => Logger.downloadJSON());
   }
@@ -717,7 +714,7 @@ const GameManager = (() => {
 
     Car.setThrottle(throttle);
 
-    UI.updateConfidence(result.confidence);
+    
 
     if (outcomeWindowStart > 0 && (now - outcomeWindowStart) < OUTCOME_WINDOW_MS) {
       const dev = Track.centerDeviation(carState.x, carState.y);
@@ -807,7 +804,7 @@ const GameManager = (() => {
       predictionChoice = await UI.showPrediction(sensorName, sensorIndex);
       UI.showBanner(`Experiment running: ${sensorName} is OFF. Watch what happens.`);
       UI.setTogglesDisabled(true);
-      UI.hideConfidence();
+
     } else {
       UI.showBanner(`${sensorName} restored.`);
       setTimeout(() => UI.hideBanner(), 2000);
@@ -818,7 +815,7 @@ const GameManager = (() => {
 
     const newSensors = Sensors.compute(Car.getState());
     const confAfter = KNN.predict(newSensors).confidence;
-    UI.updateConfidence(confAfter);
+
 
     paused = false;
 
@@ -842,7 +839,7 @@ const GameManager = (() => {
         crashedDuringOutcomeWindow = false;
         outcomeResolver = null;
         Logger.logToggle(sensorIndex, sensorName, newState, predictionChoice, outcome, confBefore, confAtOutcome, lapProg, OUTCOME_WINDOW_MS, ablationRound);
-        UI.showConfidence();
+
         const match = predictionChoice === outcome;
         UI.showBanner(`You predicted: ${OUTCOME_LABELS[predictionChoice]}. Result: ${OUTCOME_LABELS[outcome]}. ${match ? '✓ Correct!' : '✗ Different than expected.'}`);
         setTimeout(() => { UI.hideBanner(); UI.setTogglesDisabled(false); }, OUTCOME_FEEDBACK_MS);
