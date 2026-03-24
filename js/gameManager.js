@@ -723,12 +723,6 @@ const GameManager = (() => {
       const dev = Track.centerDeviation(carState.x, carState.y);
       const absDev = Math.abs(dev);
       outcomeWindowMaxAbsDeviation = Math.max(outcomeWindowMaxAbsDeviation, absDev);
-
-      // If a decisive degradation happens during the window and a resolver exists,
-      // finalize the outcome early instead of waiting for the timeout.
-      if (outcomeResolver && absDev > DEGRADED_THRESHOLD_CENTER_DEV) {
-        outcomeResolver();
-      }
     }
 
     if (now - lastLogTime > LOG_INTERVAL) {
