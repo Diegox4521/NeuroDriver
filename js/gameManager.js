@@ -335,6 +335,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 2: AI Driving');
     UI.hideDemoCount();
+    UI.hideInstruction();
     aiSmoothedSteering = 0;
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
@@ -388,6 +389,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 3: Sensor Experiments');
     UI.showToggles();
+    UI.hideInstruction();
     ablationRound = 1;
     ablationRound2Announced = false;
     UI.unlockSensor(2);
@@ -411,15 +413,6 @@ const GameManager = (() => {
     );
     Logger.setPostAblationRanking(ranking);
     Logger.logEvent('post_ablation_ranking', { ranking });
-    await beginReflection();
-  }
-
-  async function beginReflection() {
-    currentPhase = 'REFLECTION';
-    Logger.logPhase('REFLECTION');
-    paused = true;
-    const result = await UI.showReflection();
-    Logger.logReflection(result.sensor, result.reason, result.skipped, result.surprisedMostSensor, result.surpriseLevel);
     endSession();
   }
 
@@ -445,8 +438,18 @@ const GameManager = (() => {
     });
     UI.setPhaseLabel('Session Complete');
     UI.hideToggles(); UI.hideInstruction(); UI.hideBanner();
-    UI.showOverlay('All done!', 'Thank you for teaching the AI. Your session data is being saved.', 'Download Data')
-      .then(() => Logger.downloadJSON());
+
+    // Auto-save data in the background instantly
+    Logger.downloadJSON();
+
+    UI.showOverlay(
+      'All done!', 
+      'Thank you! Your data has been securely saved to the lab server. Please follow the instructions to complete your post-survey.', 
+      'Finish & Reset'
+    ).then(() => {
+      // Reload the page to prep the computer for the next middle schooler
+      window.location.reload();
+    });
   }
 
   // ── Per-frame update ───────────────────────────────────────────────────────

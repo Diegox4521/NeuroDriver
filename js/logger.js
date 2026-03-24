@@ -31,7 +31,6 @@ const Logger = (() => {
   let preAblationRanking  = null;
   let postAblationRanking = null;
 
-  let reflectionData = null;
 
 
 
@@ -56,7 +55,6 @@ const Logger = (() => {
     };
     preAblationRanking = null;
     postAblationRanking = null;
-    reflectionData = null;
 
     feasibilityMetrics = null;
   }
@@ -152,16 +150,6 @@ const Logger = (() => {
   function setPreAblationRanking(ranking)  { preAblationRanking = ranking; }
   function setPostAblationRanking(ranking) { postAblationRanking = ranking; }
 
-  function logReflection(sensor, reason, skipped, surprisedMostSensor, surpriseLevel) {
-    reflectionData = {
-      sensor,
-      reason,
-      skipped,
-      surprisedMostSensor: surprisedMostSensor || null,
-      surpriseLevel: surpriseLevel || null,
-    };
-  }
-
 
 
   function exportJSON() {
@@ -178,7 +166,6 @@ const Logger = (() => {
       feasibility: feasibilityMetrics,
       preAblationRanking,
       postAblationRanking,
-      reflection: reflectionData,
       phases,
       frames,
       toggles,
@@ -188,18 +175,35 @@ const Logger = (() => {
     };
   }
 
-  function downloadJSON() {
+  async function downloadJSON() {
     const data = exportJSON();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const pid = participantId || 'anon';
-    a.download = `neurodriver_${pid}_${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const jsonString = JSON.stringify(data, null, 2);
+
+    try {
+      // 1. Try to silently save to the local Node.js server
+      const response = await fetch('http://localhost:3000/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonString
+      });
+      
+      if (!response.ok) throw new Error('Local server rejected the save request');
+      console.log('✅ Data silently saved to local server!');
+      
+    } catch (err) {
+      // 2. Fallback: If the server isn't running, download the file so data isn't lost!
+      console.warn('⚠️ Local server not found. Falling back to browser file download.', err);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const pid = participantId || 'anon';
+      a.download = `neurodriver_${pid}_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   }
 
   return {
@@ -215,7 +219,6 @@ const Logger = (() => {
     setDemoQuality,
     setPreAblationRanking,
     setPostAblationRanking,
-    logReflection,
 
     setFeasibilityMetrics,
     sessionElapsedMs,

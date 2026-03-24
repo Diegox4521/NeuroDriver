@@ -117,7 +117,6 @@
         <div id="rankingButtons" class="ranking-buttons"></div>
         <div id="rankingList" class="ranking-list"></div>
         <button id="rankingSubmit" class="primary-btn ranking-submit hidden">Submit ranking</button>
-        <button id="rankingReset" class="secondary-btn ranking-reset hidden">Reset</button>
       </div>
     </div>
 
@@ -127,40 +126,6 @@
         <h3>What will happen?</h3>
         <p id="predictionQuestion"></p>
         <div id="predictionChoices"></div>
-      </div>
-    </div>
-
-    <!-- Reflection modal -->
-    <div id="reflectionModal" class="hidden">
-      <div id="reflectionContent">
-        <h3>Reflection</h3>
-        <p class="refl-q">Which sensor surprised you most?</p>
-        <select id="reflectSurprisedMost">
-          <option value="">— Choose one —</option>
-          <option value="LiDAR">LiDAR</option>
-          <option value="Camera">Camera</option>
-          <option value="Speedometer">Speedometer</option>
-          <option value="None">None surprised me</option>
-        </select>
-        <p class="refl-q">How surprised were you?</p>
-        <div class="refl-scale">
-          <label><input type="radio" name="reflectSurprise" value="not"> Not surprised</label>
-          <label><input type="radio" name="reflectSurprise" value="a_little"> A little surprised</label>
-          <label><input type="radio" name="reflectSurprise" value="very"> Very surprised</label>
-        </div>
-        <p class="refl-q">Pick one sensor. What information does it give the AI, and what does the AI have to guess without it?</p>
-        <select id="reflectExplainSensor">
-          <option value="">— Choose a sensor —</option>
-          <option value="LiDAR">LiDAR</option>
-          <option value="Camera">Camera</option>
-          <option value="Speedometer">Speedometer</option>
-        </select>
-        <textarea id="reflectExplainWhy" rows="2" placeholder="What does this sensor tell the AI? What does the AI have to guess without it?"></textarea>
-        <p id="reflectMessage" class="reflect-msg hidden"></p>
-        <div class="reflect-buttons">
-          <button id="reflectSubmit" class="primary-btn">Submit</button>
-          <button id="reflectSkip" class="secondary-btn">Skip</button>
-        </div>
       </div>
     </div>
 

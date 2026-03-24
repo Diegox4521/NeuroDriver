@@ -215,14 +215,12 @@ const UI = (() => {
       const subtitleEl = $('#rankingSubtitle');
       const buttonsDiv = $('#rankingButtons');
       const listDiv = $('#rankingList');
-      const resetBtn = $('#rankingReset');
       const submitBtn = $('#rankingSubmit');
 
       titleEl.textContent = titleText;
       subtitleEl.textContent = subtitleText;
       buttonsDiv.innerHTML = '';
       listDiv.innerHTML = '';
-      resetBtn.classList.add('hidden');
       submitBtn.classList.add('hidden');
 
       const sensorNames = Sensors.SENSOR_NAMES;  // 3 sensors: LiDAR, Camera, Speedometer
@@ -241,7 +239,6 @@ const UI = (() => {
       function finish() {
         modal.classList.add('hidden');
         submitBtn.onclick = null;
-        resetBtn.onclick = null;
         resolve([...ranking]);
       }
 
@@ -303,23 +300,12 @@ const UI = (() => {
           listDiv.appendChild(row);
         });
 
-        if (ranking.length > 0) {
-          resetBtn.classList.remove('hidden');
-        } else {
-          resetBtn.classList.add('hidden');
-        }
-
         if (ranking.length === 3) {
           submitBtn.classList.remove('hidden');
         } else {
           submitBtn.classList.add('hidden');
         }
       }
-
-      resetBtn.onclick = () => {
-        ranking.length = 0;
-        render();
-      };
 
       submitBtn.onclick = () => {
         if (ranking.length === 3) finish();
@@ -359,67 +345,6 @@ const UI = (() => {
   }
 
   // ── Reflection modal ──
-
-  function showReflection() {
-    return new Promise(resolve => {
-      reflModal().classList.remove('hidden');
-      const surprisedMostEl = $('#reflectSurprisedMost');
-      const surpriseRadios = document.querySelectorAll('input[name="reflectSurprise"]');
-      const explainSensorEl = $('#reflectExplainSensor');
-      const explainWhyEl = $('#reflectExplainWhy');
-      const msgEl = document.getElementById('reflectMessage');
-      const skipBtn = document.getElementById('reflectSkip');
-
-      if (msgEl) { msgEl.textContent = ''; msgEl.classList.add('hidden'); }
-      if (surprisedMostEl) surprisedMostEl.value = '';
-      if (explainSensorEl) explainSensorEl.value = '';
-      if (explainWhyEl) explainWhyEl.value = '';
-      surpriseRadios.forEach(r => { r.checked = false; });
-
-      function getSurpriseLevel() {
-        const checked = document.querySelector('input[name="reflectSurprise"]:checked');
-        return checked ? checked.value : null;
-      }
-
-      $('#reflectSubmit').onclick = () => {
-        const surprisedMostSensor = (surprisedMostEl && surprisedMostEl.value.trim()) || null;
-        const surpriseLevel = getSurpriseLevel();
-        const explainSensor = (explainSensorEl && explainSensorEl.value.trim()) || '';
-        const explainWhy = (explainWhyEl && explainWhyEl.value.trim()) || '';
-        const hasSurprisedMost = surprisedMostSensor && surprisedMostSensor !== '';
-        const hasSurpriseLevel = surpriseLevel != null;
-        const hasExplanation = explainSensor && explainWhy;
-        if (!hasSurprisedMost || !hasSurpriseLevel || !hasExplanation) {
-          if (msgEl) {
-            msgEl.textContent = 'Please answer all three questions or click Skip.';
-            msgEl.classList.remove('hidden');
-          }
-          return;
-        }
-        reflModal().classList.add('hidden');
-        resolve({
-          sensor: explainSensor,
-          reason: explainWhy,
-          skipped: false,
-          surprisedMostSensor: surprisedMostSensor || null,
-          surpriseLevel,
-        });
-      };
-
-      if (skipBtn) {
-        skipBtn.onclick = () => {
-          reflModal().classList.add('hidden');
-          resolve({
-            sensor: '',
-            reason: '',
-            skipped: true,
-            surprisedMostSensor: null,
-            surpriseLevel: null,
-          });
-        };
-      }
-    });
-  }
 
   // ── Instructions toast ──
 
@@ -489,7 +414,6 @@ const UI = (() => {
     showSensorIntro,
     showRanking,
     showPrediction,
-    showReflection,
     showInstruction,
     showInstructionWithTip,
     pulseInstructionPanel,
