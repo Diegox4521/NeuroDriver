@@ -125,21 +125,7 @@ const Car = (() => {
     ctx.fillRect(CAR_LENGTH / 2 - 2, -CAR_WIDTH / 2 + 1, 3, 3);
     ctx.fillRect(CAR_LENGTH / 2 - 2, CAR_WIDTH / 2 - 4, 3, 3);
 
-    // Light beams
-    if (!crashed && speed > 0.01) {
-      ctx.globalCompositeOperation = 'screen';
-      const gradient = ctx.createLinearGradient(CAR_LENGTH / 2, 0, CAR_LENGTH / 2 + 60, 0);
-      gradient.addColorStop(0, 'rgba(254, 240, 138, 0.3)');
-      gradient.addColorStop(1, 'rgba(254, 240, 138, 0)');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.moveTo(CAR_LENGTH / 2, -CAR_WIDTH / 2 + 2);
-      ctx.lineTo(CAR_LENGTH / 2 + 60, -CAR_WIDTH / 2 - 15);
-      ctx.lineTo(CAR_LENGTH / 2 + 60, CAR_WIDTH / 2 + 15);
-      ctx.lineTo(CAR_LENGTH / 2, CAR_WIDTH / 2 - 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    }
+    // Light beams removed to avoid confusion with the Camera sensor cone
 
     ctx.restore();
 
