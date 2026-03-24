@@ -10,6 +10,7 @@
 const GameManager = (() => {
 
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
+  const DEV_SKIP_PRACTICE = false;
 
   const PHASE_DURATIONS = {
     PRACTICE: DEV_SHORT ? 5 : 30,
@@ -261,7 +262,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     spaceWasDown = false;
     UI.setPhaseLabel('Practice: Learn the Controls');
-    UI.showInstruction('Practice driving! Use ↑ to accelerate and ← → to steer. Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready.');
+    UI.showInstruction('Practice driving! Use ↑ to accelerate and ← → to steer.');
     UI.hideToggles();
     UI.hideConfidence();
     Car.respawn();
@@ -679,8 +680,8 @@ const GameManager = (() => {
     Car.setSteering(smoothedSteering);
     Car.setThrottle(throttleFromKeys());
     Sensors.compute(Car.getState());
-    if (keys['Space'] && !spaceWasDown) { spaceWasDown = true; beginSensorIntro(); return; }
-    spaceWasDown = keys['Space'];
+    if (DEV_SKIP_PRACTICE && keys['Space'] && !spaceWasDown) { spaceWasDown = true; beginSensorIntro(); return; }
+    if (DEV_SKIP_PRACTICE) spaceWasDown = keys['Space'];
   }
 
   // ── AI driving ───────────────────────────────────────────────────────────
