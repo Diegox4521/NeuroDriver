@@ -248,8 +248,8 @@ const GameManager = (() => {
     currentPhase = 'INTRO';
     Logger.logPhase('INTRO');
     await UI.showOverlay(
-      'Welcome!',
-      'You are going to teach an AI how to drive. First, practice driving the car with the arrow keys. Then the AI will watch and learn from you.',
+      'Ready to Practice?',
+      'Get comfortable with the controls before the AI starts watching. Use ↑ to accelerate and ← → to steer.',
       'Start Practice'
     );
     beginPractice();
