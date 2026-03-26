@@ -781,8 +781,19 @@ canvas {
   margin-top: 14px;
 }
 
-/* ── Speedometer sensor button color ── */
+/* ── Sensor button distinct colors ── */
 
+/* Camera (Green) */
+.sensor-btn[data-modality="1"].active {
+  border-color: #34d399;
+  background: #064e3b;
+}
+
+.sensor-btn[data-modality="1"]:hover:not(.locked) {
+  border-color: #6ee7b7;
+}
+
+/* Speedometer (Yellow) */
 .sensor-btn[data-modality="2"].active {
   border-color: #facc15;
   background: #422006;

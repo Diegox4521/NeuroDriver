@@ -192,9 +192,9 @@ const GameManager = (() => {
   function refreshDemoInstruction() {
     if (!drivingTipActive || typeof UI.showInstructionWithTip !== 'function') return;
     if (currentPhase === 'HUMAN_DEMO') {
-      UI.showInstructionWithTip('Drive carefully — the AI is learning from you!', DRIVING_TIP_TEXT);
+      UI.showInstructionWithTip('Keep driving laps until the timer runs out! The AI is learning from you.', DRIVING_TIP_TEXT);
     } else if (currentPhase === 'HUMAN_DEMO_EXTRA') {
-      UI.showInstructionWithTip('Your AI needs more practice data — drive a bit more.', DRIVING_TIP_TEXT);
+      UI.showInstructionWithTip('Your AI needs more practice data — keep driving laps until time runs out.', DRIVING_TIP_TEXT);
     }
   }
 
@@ -274,11 +274,19 @@ const GameManager = (() => {
     await UI.showSensorIntro();
     Logger.logEvent('sensor_intro_shown', {});
     paused = false;
-    beginHumanDemo();
+    await beginHumanDemo();
   }
 
-  function beginHumanDemo() {
+  async function beginHumanDemo() {
     currentPhase = 'HUMAN_DEMO';
+    paused = true;
+    await UI.showOverlay(
+      'Phase 1: Teach the AI',
+      'Objective: Keep driving laps until the timer runs out! The AI will watch your steering and speed to learn how to drive.',
+      'Start Driving'
+    );
+    paused = false;
+
     Logger.logPhase('HUMAN_DEMO');
     phaseStartTime = performance.now();
     demoCenterDevSum = demoCenterDevCount = demoCrashCount = 0;
@@ -288,7 +296,7 @@ const GameManager = (() => {
     demoSpeedSamples = [];
     drivingTipActive = false;
     UI.setPhaseLabel('Phase 1: Teach the AI');
-    UI.showInstruction('Drive carefully — the AI is learning from you!');
+    UI.showInstruction('Keep driving laps until the timer runs out! The AI is learning from you.');
     UI.showDemoCount();
     UI.setDemoCount(0, MIN_DEMO_COUNT);
     UI.hideToggles();
@@ -304,7 +312,7 @@ const GameManager = (() => {
     paused = true;
     UI.hideInstruction(); UI.hideBanner(); UI.hideDemoCount();
     const ranking = await UI.showRanking(
-      'Before the AI drives, which sensor do you think it needs most to drive safely? Make your best guess — there\'s no right answer yet.',
+      'Before the AI drives, what is your ranking of the sensors it needs most to drive safely? Make your best guess — there\'s no right answer yet.',
       'Tap each sensor in order (most important first). Use the arrows to reorder, then Submit.'
     );
     Logger.setPreAblationRanking(ranking);
@@ -361,9 +369,9 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 1: Teach the AI (more)');
     if (drivingTipActive && typeof UI.showInstructionWithTip === 'function') {
-      UI.showInstructionWithTip('Your AI needs more practice data — drive a bit more.', DRIVING_TIP_TEXT);
+      UI.showInstructionWithTip('Your AI needs more practice data — keep driving laps until time runs out.', DRIVING_TIP_TEXT);
     } else {
-      UI.showInstruction('Your AI needs more practice data — drive a bit more.');
+      UI.showInstruction('Your AI needs more practice data — keep driving laps until time runs out.');
     }
     UI.showDemoCount();
     UI.setDemoCount(0, MIN_DEMO_COUNT_EXTRA);
@@ -408,7 +416,7 @@ const GameManager = (() => {
     UI.unlockSensor(2);
     Sensors.resetToggles();
     const ranking = await UI.showRanking(
-      'Now that you\'ve experimented, which sensor does your AI need most to drive safely?',
+      'Now that you\'ve experimented, what is your ranking of the sensors your AI needs most to drive safely?',
       'Tap each sensor in order (most important first). Use the arrows to reorder, then Submit.'
     );
     Logger.setPostAblationRanking(ranking);
