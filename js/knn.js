@@ -17,7 +17,7 @@ const KNN = (() => {
   const INPUT_SIZE = 6;
   const HIDDEN_SIZE = 64;
   const LEARNING_RATE = 0.005;
-  const EPOCHS = 80;
+  const EPOCHS = 120;
 
   let demonstrations = [];
   let W1, b1, W2, b2;
@@ -86,7 +86,7 @@ const KNN = (() => {
       }
       for (const d of data) {
         const noisy = d.sensors.map(v => {
-          const n = v + (Math.random() - 0.5) * 0.08;
+          const n = v + (Math.random() - 0.5) * 0.02;
           return Math.max(0, Math.min(1, n));
         });
         trainOne(noisy, d.steering);
@@ -108,7 +108,7 @@ const KNN = (() => {
       demonstrations.push({ sensors: [...x], steering: target });
     }
     // Near-wall oversampling: teaches "when close to wall → turn NOW"
-    const nearWall = x[1] < 0.3 || x[2] < 0.3;
+    const nearWall = x[1] < 0.3 || x[2] < 0.3 || (x[4] < 0.25 && x[1] < 0.6 && x[2] < 0.6);
     if (nearWall) {
       demonstrations.push({ sensors: [...x], steering: target });
     }
@@ -123,7 +123,7 @@ const KNN = (() => {
     const x = sensorVector.map(v => Math.max(0, Math.min(1, v)));
     const { steering: rawSteering } = forward(x);
     // Scale up to help the AI commit to turns instead of under-correcting
-    const steering = Math.max(-1, Math.min(1, rawSteering * 1.2));
+    const steering = Math.tanh(rawSteering * 1.2);
     const K = Math.min(3, demonstrations.length);
     const dists = demonstrations.map(d => {
       let s = 0;

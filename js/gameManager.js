@@ -90,7 +90,7 @@ const GameManager = (() => {
   let spaceWasDown = false;
 
   const OUTCOME_WINDOW_MS = 7000;
-  const DEGRADED_THRESHOLD_CENTER_DEV = 0.75;
+  const DEGRADED_THRESHOLD_CENTER_DEV = 0.45;
   const MIN_DEMO_COUNT = 100;
   /** Lower bar for warmup-retry segment (fresh buffer after KNN.reset). */
   const MIN_DEMO_COUNT_EXTRA = 60;
@@ -181,9 +181,6 @@ const GameManager = (() => {
 
     const inCorner = forward < 0.75;
     if (inCorner) return true;
-
-    const minWall = Math.min(leftNear, rightNear, forward);
-    if (minWall < 0.1) return false;
 
     const steeringChange = Math.abs(labelSteering - prevSteering);
     return steeringChange < 0.5;
@@ -481,7 +478,7 @@ const GameManager = (() => {
       ablationRound = 2;
       ablationRound2Announced = true;
       UI.unlockSensor(2);
-      UI.showBanner('Round 2 — Speedometer is now unlocked.');
+      UI.showBanner('🌟 Speedometer is now unlocked! Give it a try.');
       Logger.logEvent('ablation_round_2', {});
       setTimeout(() => UI.hideBanner(), 5000);
     }
@@ -698,6 +695,13 @@ const GameManager = (() => {
     const carState = Car.getState();
     const sensorsRaw = Sensors.rawValues(carState);   // unmasked, for throttle
     const sensorsMasked = Sensors.compute(carState);     // masked by toggles, for steering
+
+    console.assert(
+      Array.isArray(sensorsMasked) &&
+      sensorsMasked.length === 6 &&
+      sensorsMasked.every(v => typeof v === 'number' && !isNaN(v)),
+      'invalid sensor vector'
+    );
 
     const result = KNN.predict(sensorsMasked);
     const resultRaw = KNN.predict(sensorsRaw);

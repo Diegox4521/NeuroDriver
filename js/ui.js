@@ -71,7 +71,7 @@ const UI = (() => {
     const desc = btn.querySelector('.sensor-desc');
     if (desc) {
       desc.setAttribute('data-original', desc.textContent);
-      desc.textContent = '\uD83D\uDD12 Unlocks in Round 2';
+      desc.textContent = '🔒 Unlocks halfway';
     }
   }
 
