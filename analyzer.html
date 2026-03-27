@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroDriver Data Analyzer</title>
+  <!-- Tailwind CSS for sleek styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans p-6 min-h-screen">
+  
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- HEADER -->
+    <header class="text-center space-y-3">
+      <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-400">
+        NeuroDriver Analytics
+      </h1>
+      <p class="text-slate-400 text-lg">Upload JSON session files below to generate instant reports.</p>
+    </header>
+
+    <!-- UPLOAD ZONE -->
+    <div class="bg-slate-800 p-8 rounded-xl ring-1 ring-slate-700 shadow-xl text-center transition-all duration-300 hover:ring-indigo-400" id="drop-zone">
+      <input type="file" id="file-input" multiple accept=".json" class="hidden" />
+      <button onclick="document.getElementById('file-input').click()" class="bg-indigo-500 hover:bg-indigo-400 text-white font-semibold py-3 px-8 rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200">
+        Select JSON Files
+      </button>
+      <p class="mt-4 text-slate-400 text-sm">Or drag and drop multiple .json files here.</p>
+      <div id="file-status" class="mt-4 text-cyan-300 font-medium h-6">Waiting for data...</div>
+    </div>
+
+    <!-- METRICS OVERVIEW -->
+    <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+      <!-- 1. Crashes (Ablation) -->
+      <div class="bg-slate-800 p-6 rounded-xl ring-1 ring-slate-700 shadow-lg">
+        <h2 class="text-xl font-semibold mb-4 text-slate-200 text-center">AI Crashes by Disabled Sensor</h2>
+        <canvas id="crashesChart"></canvas>
+      </div>
+
+      <!-- 2. Teaching Quality -->
+      <div class="bg-slate-800 p-6 rounded-xl ring-1 ring-slate-700 shadow-lg flex flex-col items-center justify-center space-y-4">
+        <h2 class="text-xl font-semibold text-slate-200 text-center">Average Human Teaching Quality</h2>
+        <div class="text-5xl font-black text-emerald-400" id="quality-score">--%</div>
+        <p class="text-slate-400 text-center max-w-sm text-sm">Amount of valid driving data generated vs discarded. Higher is better.</p>
+        
+        <div class="w-full mt-4 border-t border-slate-700 pt-4 flex justify-around">
+          <div class="text-center">
+            <p class="text-xs text-slate-400">Total Sessions</p>
+            <p class="text-xl font-bold" id="total-sessions">0</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-slate-400">Total Laps</p>
+            <p class="text-xl font-bold" id="total-laps">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Rankings Shift -->
+      <div class="bg-slate-800 p-6 rounded-xl ring-1 ring-slate-700 shadow-lg md:col-span-2">
+        <h2 class="text-xl font-semibold mb-4 text-slate-200 text-center">Pre vs. Post Experiment Sensor Ranking</h2>
+        <p class="text-center text-sm text-slate-400 mb-6">Lower bar = ranked closer to 1 (more important).</p>
+        <div class="h-64 relative">
+          <canvas id="rankingsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Drag & Drop Handlers
+    const dropZone = document.getElementById('drop-zone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('ring-indigo-400'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('ring-indigo-400'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('ring-indigo-400');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+    });
+
+    // Chart instance trackers
+    let crashesChartInstance = null;
+    let rankingsChartInstance = null;
+
+    Chart.defaults.color = '#94a3b8'; // tailwind slate-400
+    Chart.defaults.font.family = 'Inter, sans-serif';
+
+    async function handleFiles(files) {
+      if (files.length === 0) return;
+      document.getElementById('file-status').innerText = `Aggregating ${files.length} file(s)...`;
+      
+      const sessions = [];
+      let laps = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.name.endsWith('.json')) continue;
+        
+        try {
+          const text = await file.text();
+          const json = JSON.parse(text);
+          if (json.dataFormatVersion) {
+            sessions.push(json);
+            laps += Array.isArray(json.laps) ? json.laps.length : 0;
+          }
+        } catch(e) {
+          console.error(`Skipping ${file.name}: not a valid JSON.`, e);
+        }
+      }
+
+      document.getElementById('file-status').innerText = `Processed ${sessions.length} valid session(s).`;
+      document.getElementById('metrics-grid').classList.remove('hidden');
+      document.getElementById('total-sessions').innerText = sessions.length;
+      document.getElementById('total-laps').innerText = laps;
+
+      renderCharts(sessions);
+    }
+
+    function renderCharts(sessions) {
+      // 1. Crash Analysis
+      const crashCounts = { "All ON": 0, "No LiDAR": 0, "No Camera": 0, "No Speed": 0, "Multiple OFF": 0 };
+      
+      sessions.forEach(session => {
+        (session.crashes || []).forEach(crash => {
+          const mask = crash.toggleMask || [true, true, true];
+          if (mask[0] && mask[1] && mask[2]) crashCounts["All ON"]++;
+          else if (!mask[0] && mask[1] && mask[2]) crashCounts["No LiDAR"]++;
+          else if (mask[0] && !mask[1] && mask[2]) crashCounts["No Camera"]++;
+          else if (mask[0] && mask[1] && !mask[2]) crashCounts["No Speed"]++;
+          else crashCounts["Multiple OFF"]++;
+        });
+      });
+
+      const ctxCrashes = document.getElementById('crashesChart').getContext('2d');
+      if(crashesChartInstance) crashesChartInstance.destroy();
+      crashesChartInstance = new Chart(ctxCrashes, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(crashCounts),
+          datasets: [{
+            label: 'Total Crashes',
+            data: Object.values(crashCounts),
+            backgroundColor: 'rgba(56, 189, 248, 0.7)',
+            borderColor: 'rgba(56, 189, 248, 1)',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+
+      // 2. Demo Quality
+      let rateSum = 0;
+      let rateCount = 0;
+      sessions.forEach(session => {
+        if(session.demoQuality && session.demoQuality.demoFilterAcceptRate != null) {
+          rateSum += session.demoQuality.demoFilterAcceptRate;
+          rateCount++;
+        }
+      });
+      document.getElementById('quality-score').innerText = rateCount > 0 
+        ? `${Math.round((rateSum / rateCount) * 100)}%` 
+        : '--%';
+
+
+      // 3. Rankings Shift
+      const preRanks = { "LiDAR": [], "Camera": [], "Speed": [] };
+      const postRanks = { "LiDAR": [], "Camera": [], "Speed": [] };
+      
+      sessions.forEach(session => {
+        const pre = session.preAblationRanking || [];
+        const post = session.postAblationRanking || [];
+        
+        pre.forEach((sensor, i) => {
+          if(sensor === 'lidar') preRanks["LiDAR"].push(i+1);
+          if(sensor === 'camera') preRanks["Camera"].push(i+1);
+          if(sensor === 'speedometer') preRanks["Speed"].push(i+1);
+        });
+        post.forEach((sensor, i) => {
+          if(sensor === 'lidar') postRanks["LiDAR"].push(i+1);
+          if(sensor === 'camera') postRanks["Camera"].push(i+1);
+          if(sensor === 'speedometer') postRanks["Speed"].push(i+1);
+        });
+      });
+
+      const avgPre = [
+        preRanks["LiDAR"].reduce((a,b)=>a+b,0) / (preRanks["LiDAR"].length||1),
+        preRanks["Camera"].reduce((a,b)=>a+b,0) / (preRanks["Camera"].length||1),
+        preRanks["Speed"].reduce((a,b)=>a+b,0) / (preRanks["Speed"].length||1)
+      ];
+      const avgPost = [
+        postRanks["LiDAR"].reduce((a,b)=>a+b,0) / (postRanks["LiDAR"].length||1),
+        postRanks["Camera"].reduce((a,b)=>a+b,0) / (postRanks["Camera"].length||1),
+        postRanks["Speed"].reduce((a,b)=>a+b,0) / (postRanks["Speed"].length||1)
+      ];
+
+      const ctxRankings = document.getElementById('rankingsChart').getContext('2d');
+      if(rankingsChartInstance) rankingsChartInstance.destroy();
+      rankingsChartInstance = new Chart(ctxRankings, {
+        type: 'bar',
+        data: {
+          labels: ['LiDAR', 'Camera', 'Speedometer'],
+          datasets: [
+            {
+              label: 'Pre-Experiment (Initial Assumption)',
+              data: avgPre,
+              backgroundColor: 'rgba(148, 163, 184, 0.8)' // slate-400
+            },
+            {
+              label: 'Post-Experiment (Final Understanding)',
+              data: avgPost,
+              backgroundColor: 'rgba(129, 140, 248, 0.9)' // indigo-400
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              reverse: true,
+              min: 1,
+              max: 3,
+              ticks: { stepSize: 1 }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
