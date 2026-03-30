@@ -10,7 +10,7 @@
 const GameManager = (() => {
 
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
-  const DEV_SKIP_PRACTICE = false;
+  const DEV_SKIP_PRACTICE = true;
 
   const PHASE_DURATIONS = {
     PRACTICE: DEV_SHORT ? 5 : 30,
@@ -179,7 +179,12 @@ const GameManager = (() => {
 
     if (speed < 0.05) return false;
 
-    const inCorner = forward < 0.75;
+    // BETTER CORNER DETECTION:
+    // Bumping the forward threshold to 0.85 and checking if the inner side walls 
+    // are starting to carve in (< 0.6). This guarantees we capture the exact 
+    // moment the human initiates a turn, even on widened corners where the 
+    // outer wall is still technically far away.
+    const inCorner = forward < 0.85 || leftNear < 0.6 || rightNear < 0.6;
     if (inCorner) return true;
 
     const steeringChange = Math.abs(labelSteering - prevSteering);
@@ -392,7 +397,7 @@ const GameManager = (() => {
     for (let i = 0; i < 3; i++) UI.applySensorBtnState(i, true);
     await UI.showOverlay(
       'Experiment Time',
-      'The AI uses 3 sensors: LiDAR, Camera, and Speedometer. Try turning sensors off to see what happens!',
+      'The AI uses 3 sensors: LiDAR, Camera, and Speedometer. Click the sensor buttons on the top right to turn them off and see what happens!',
       'Start Experimenting'
     );
     currentPhase = 'AI_ABLATION';
@@ -402,7 +407,7 @@ const GameManager = (() => {
     phaseStartTime = performance.now();
     UI.setPhaseLabel('Phase 3: Sensor Experiments');
     UI.showToggles();
-    UI.hideInstruction();
+    UI.showInstruction('Experiment: Click the sensor buttons on the top right to turn them off and observe the AI.');
     ablationRound = 1;
     ablationRound2Announced = false;
     UI.unlockSensor(2);
@@ -513,9 +518,6 @@ const GameManager = (() => {
             UI.showBanner('Let\'s get a bit more practice data — keep driving!');
             setTimeout(() => UI.hideBanner(), 6000);
           }
-          if (lastDemoSensors) {
-            for (let i = 0; i < CRASH_REPLAY_COUNT; i++) KNN.addDemonstration(lastDemoSensors, lastDemoSteering);
-          }
         }
         if (currentPhase === 'AI_ABLATION') {
           ablationAICrashCount++;
@@ -614,7 +616,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = false;
+  const DEV_AUTO_DEMO = true;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -812,8 +814,13 @@ const GameManager = (() => {
 
   // ── Sensor toggle handler ─────────────────────────────────────────────────
 
+  let isToggling = false;
+
   async function handleToggle(sensorIndex, newState) {
     if (paused || currentPhase !== 'AI_ABLATION') return;
+    if (isToggling) return; // Prevent double-clicks
+    isToggling = true;
+
     resetCrashStreak();
     paused = true;
 
@@ -824,6 +831,7 @@ const GameManager = (() => {
     let predictionChoice = null;
 
     if (!newState) {
+      // Game remains paused while modal is awaited, so no background crashes!
       predictionChoice = await UI.showPrediction(sensorName, sensorIndex);
       UI.showBanner(`Experiment running: ${sensorName} is OFF. Watch what happens.`);
       UI.setTogglesDisabled(true);
@@ -838,7 +846,6 @@ const GameManager = (() => {
 
     const newSensors = Sensors.compute(Car.getState());
     const confAfter = KNN.predict(newSensors).confidence;
-
 
     paused = false;
 
@@ -865,7 +872,7 @@ const GameManager = (() => {
 
         const match = predictionChoice === outcome;
         UI.showBanner(`You predicted: ${OUTCOME_LABELS[predictionChoice]}. Result: ${OUTCOME_LABELS[outcome]}. ${match ? '✓ Correct!' : '✗ Different than expected.'}`);
-        setTimeout(() => { UI.hideBanner(); UI.setTogglesDisabled(false); }, OUTCOME_FEEDBACK_MS);
+        setTimeout(() => { UI.hideBanner(); UI.setTogglesDisabled(false); isToggling = false; }, OUTCOME_FEEDBACK_MS);
       };
 
       setTimeout(() => {
@@ -876,6 +883,7 @@ const GameManager = (() => {
     } else {
       UI.setTogglesDisabled(false);
       Logger.logToggle(sensorIndex, sensorName, newState, null, null, confBefore, confAfter, lapProg, null, ablationRound);
+      isToggling = false;
     }
   }
 
