@@ -1,5 +1,5 @@
 /**
- * KNN (BehaviorCloningNN) — small MLP for imitation learning.
+ * MLP (BehaviorCloningNN) — small MLP for imitation learning.
  *
  * Interface:
  *   addDemonstration(sensors, steering)  — store demo (6D sensors)
@@ -12,7 +12,7 @@
  * Output: steering in [-1, 1], confidence in [0, 1]
  */
 
-const KNN = (() => {
+const MLP = (() => {
 
   const INPUT_SIZE = 6;
   const HIDDEN_SIZE = 64;
@@ -73,11 +73,10 @@ const KNN = (() => {
 
   function train() {
     if (demonstrations.length === 0) return;
-    // Dataset composition summary (research diagnostics)
     const straight = demonstrations.filter(d => Math.abs(d.steering) <= 0.15).length;
     const moderate = demonstrations.filter(d => Math.abs(d.steering) > 0.15 && Math.abs(d.steering) <= 0.4).length;
     const sharp    = demonstrations.filter(d => Math.abs(d.steering) > 0.4).length;
-    console.log(`[KNN] Training on ${demonstrations.length} samples: ${straight} straight, ${moderate} moderate turns, ${sharp} sharp turns`);
+    console.log(`[MLP] Training on ${demonstrations.length} samples: ${straight} straight, ${moderate} moderate turns, ${sharp} sharp turns`);
     for (let epoch = 0; epoch < EPOCHS; epoch++) {
       const data = [...demonstrations];
       for (let i = data.length - 1; i > 0; i--) {
@@ -107,7 +106,7 @@ const KNN = (() => {
     } else if (absSteering > 0.15) {
       demonstrations.push({ sensors: [...x], steering: target });
     }
-    // Near-wall oversampling: teaches "when close to wall → turn NOW"
+    // Near-wall oversampling: teaches "when close to wall, turn NOW"
     const nearWall = x[1] < 0.3 || x[2] < 0.3 || (x[4] < 0.25 && x[1] < 0.6 && x[2] < 0.6);
     if (nearWall) {
       demonstrations.push({ sensors: [...x], steering: target });

@@ -78,8 +78,8 @@ const Logger = (() => {
 
   function logPhase(name) { phases.push({ phase: name, t: t() }); }
 
-  function logFrame(phase, carState, sensorsRaw, sensorsMasked, toggleMask, aiResult) {
-    frames.push({
+  function logFrame(phase, carState, sensorsRaw, sensorsMasked, toggleMask, aiResult, extras) {
+    const entry = {
       t: t(),
       phase,
       x: +carState.x.toFixed(1),
@@ -91,10 +91,15 @@ const Logger = (() => {
       toggleMask: [...toggleMask],
       aiSteering: aiResult ? +aiResult.steering.toFixed(4) : null,
       aiConfidence: aiResult ? +aiResult.confidence.toFixed(4) : null,
-    });
+    };
+    if (extras) {
+      if (extras.humanSteering != null) entry.humanSteering = +extras.humanSteering.toFixed(4);
+      if (extras.centerDev != null) entry.centerDev = +extras.centerDev.toFixed(4);
+    }
+    frames.push(entry);
   }
 
-  function logToggle(sensorIndex, sensorName, newState, prediction, outcome, confBefore, confAfter, lapProgress, windowMs, ablationRound) {
+  function logToggle(sensorIndex, sensorName, newState, prediction, outcome, confBefore, confAfter, lapProgress, windowMs, ablationRound, baselineAvgDev, postAvgDev, delta, maxAbsDev, predictionResponseMs) {
     toggles.push({
       t: t(),
       sensorIndex,
@@ -102,11 +107,16 @@ const Logger = (() => {
       newState,
       prediction,
       outcome,
+      predictionResponseMs: predictionResponseMs != null ? predictionResponseMs : null,
       confidenceBefore: confBefore != null ? +confBefore.toFixed(4) : null,
       confidenceAfter:  confAfter != null  ? +confAfter.toFixed(4)  : null,
       lapProgress:      lapProgress != null ? +lapProgress.toFixed(4) : null,
       outcomeWindowMs:  windowMs,
       ablationRound,
+      baselineAvgDev:   baselineAvgDev != null ? +baselineAvgDev.toFixed(4) : null,
+      postAvgDev:       postAvgDev != null     ? +postAvgDev.toFixed(4)     : null,
+      delta:            delta != null          ? +delta.toFixed(4)          : null,
+      maxAbsDev:        maxAbsDev != null       ? +maxAbsDev.toFixed(4)      : null,
     });
   }
 
@@ -181,7 +191,7 @@ const Logger = (() => {
 
     try {
       // 1. Try to silently save to the local Node.js server
-      const response = await fetch('http://localhost:3000/save', {
+      const response = await fetch('/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: jsonString
@@ -192,7 +202,7 @@ const Logger = (() => {
       
     } catch (err) {
       // 2. Fallback: If the server isn't running, download the file so data isn't lost!
-      console.warn('⚠️ Local server not found. Falling back to browser file download.', err);
+      console.warn('Local server not reachable. Falling back to browser file download.', err);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

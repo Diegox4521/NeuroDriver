@@ -1,7 +1,6 @@
 /**
  * UI — manages HTML overlays, sensor toggle buttons, prediction prompts,
- * confidence bar, experiment banners, sensor intro, ranking widget,
- * and the reflection modal (including conditional Q4 ethics probe).
+ * experiment banners, sensor intro, ranking widget, and dashcam HUD.
  */
 
 const UI = (() => {
@@ -9,9 +8,6 @@ const UI = (() => {
   const $ = (sel) => document.querySelector(sel);
   const phaseLabel        = () => $('#phaseLabel');
   const timerEl           = () => $('#timer');
-  const confidenceContainer = () => $('#confidenceContainer');
-  const confBarInner      = () => $('#confidenceBarInner');
-  const confValue         = () => $('#confidenceValue');
   const sensorTogglesDiv  = () => $('#sensorToggles');
   const experimentBanner  = () => $('#experimentBanner');
   const demoCountContainer = () => $('#demoCountContainer');
@@ -81,17 +77,6 @@ const UI = (() => {
     const desc = btn.querySelector('.sensor-desc');
     const original = desc ? desc.getAttribute('data-original') : null;
     if (desc && original) desc.textContent = original;
-  }
-
-  // ── Confidence bar ──
-
-  function updateConfidence(value) {
-    const pct = Math.round(value * 100);
-    confBarInner().style.width = pct + '%';
-    confValue().textContent = pct + '%';
-    if (value > 0.7) confBarInner().style.background = '#22c55e';
-    else if (value > 0.4) confBarInner().style.background = '#f59e0b';
-    else confBarInner().style.background = '#ef4444';
   }
 
   // ── Experiment banner ──
@@ -216,14 +201,16 @@ const UI = (() => {
       const listDiv = $('#rankingList');
       const submitBtn = $('#rankingSubmit');
 
+      const openTime = performance.now();
+      let reorderCount = 0;
+
       titleEl.textContent = titleText;
       subtitleEl.textContent = subtitleText;
       buttonsDiv.innerHTML = '';
       listDiv.innerHTML = '';
       submitBtn.classList.add('hidden');
 
-      const sensorNames = Sensors.SENSOR_NAMES;  // 3 sensors: LiDAR, Camera, Speedometer
-      const ordinals = ['1st', '2nd', '3rd'];
+      const sensorNames = Sensors.SENSOR_NAMES;
       const ranking = [];
 
       function moveRank(index, delta) {
@@ -232,13 +219,18 @@ const UI = (() => {
         const tmp = ranking[index];
         ranking[index] = ranking[j];
         ranking[j] = tmp;
+        reorderCount++;
         render();
       }
 
       function finish() {
         modal.classList.add('hidden');
         submitBtn.onclick = null;
-        resolve([...ranking]);
+        resolve({
+          ranking: [...ranking],
+          durationMs: Math.round(performance.now() - openTime),
+          reorderCount,
+        });
       }
 
       function render() {
@@ -327,6 +319,7 @@ const UI = (() => {
 
   function showPrediction(sensorName, sensorIndex) {
     return new Promise(resolve => {
+      const openTime = performance.now();
       predQuestion().textContent =
         `If your AI can't use its ${sensorName}, it will:`;
       predChoices().innerHTML = '';
@@ -337,7 +330,7 @@ const UI = (() => {
         btn.textContent = opt.label;
         btn.onclick = () => {
           predModal().classList.add('hidden');
-          resolve(opt.id);
+          resolve({ choice: opt.id, responseMs: Math.round(performance.now() - openTime) });
         };
         predChoices().appendChild(btn);
       });
@@ -404,7 +397,6 @@ const UI = (() => {
   return {
     initToggleButtons,
     applySensorBtnState,
-    updateConfidence,
     showBanner,
     hideBanner,
     showLogin,

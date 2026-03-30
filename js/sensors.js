@@ -225,7 +225,7 @@ const Sensors = (() => {
     rawValues,
     draw,
     setToggle,
-    getToggleMask: () => toggleMask,
+    getToggleMask: () => [...toggleMask],
     resetToggles,
     generateCameraDashcam,
     getLastValues: () => [...lastValues],

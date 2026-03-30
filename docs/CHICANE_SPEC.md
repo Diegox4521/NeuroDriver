@@ -62,7 +62,7 @@ So the car encounters the **left kink first**, then the **right kink**, then str
 
 - **LiDAR** casts **four** rays from the car: leftFar (-60°), leftNear (-30°), rightNear (+30°), rightFar (+60°). See `js/sensors.js`. In the 6D vector these are **`sensors[0..3]`**.
 - **Camera** uses a separate **forward (0°)** raycast (same max range `RAY_MAX_DIST = 200` px). The **normalized** value is `distance_to_wall / 200`, in **[0, 1]**.
-  - In the 6D sensor vector this is **`sensors[4]`** (KNN + logging). It is **not** drawn as a cyan LiDAR beam; on canvas it appears only as the **green camera cone** (and dashcam).
+  - In the 6D sensor vector this is **`sensors[4]`** (MLP + logging). It is **not** drawn as a cyan LiDAR beam; on canvas it appears only as the **green camera cone** (and dashcam).
 - **LiDAR beams** on the canvas: each of the four side rays is **cyan** when `(dist / RAY_MAX_DIST) > 0.5` and **red** otherwise.
 
 **Why the forward (camera) reading drops in the chicane:**  
@@ -101,4 +101,4 @@ When reproducing or verifying the chicane:
 | Centerline and walls | `js/track.js` — `buildCenterline(30)`, `buildWalls()`, `ROAD_HALF_WIDTH` |
 | Camera forward index and max distance | `js/sensors.js` — vector index **4**, `RAY_MAX_DIST = 200` |
 | LiDAR side ray color threshold | `js/sensors.js` — `(r.dist / RAY_MAX_DIST) > 0.5` → cyan else red |
-| Use of forward channel for corners / recording | `js/gameManager.js` — e.g. `sensors[4]`, `forward < 0.75` in `shouldRecord` |
+| Use of forward channel for corners / recording | `js/gameManager.js` — e.g. `sensors[4]`, `forward < 0.85` in `shouldRecord` |

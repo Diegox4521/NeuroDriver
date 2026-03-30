@@ -30,7 +30,6 @@
     Car.update(dt);
     
     const carState = Car.getState();
-    Sensors.compute(carState);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -47,7 +46,7 @@
 
     // Update DOM Mini HUD
     if (typeof UI.updateMiniHUD === 'function') {
-      UI.updateMiniHUD(Sensors.rawValues(carState), Sensors.getToggleMask());
+      UI.updateMiniHUD(Sensors.getLastValues(), Sensors.getToggleMask());
     }
 
     // Render 3D Dashcam feed

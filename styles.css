@@ -86,32 +86,6 @@ canvas {
   color: #38bdf8;
 }
 
-/* ── Confidence ── */
-
-#confidenceContainer { text-align: right; }
-
-#confidenceBarOuter {
-  width: 140px;
-  height: 8px;
-  background: #334155;
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 4px 0 2px auto;
-}
-
-#confidenceBarInner {
-  height: 100%;
-  background: #22c55e;
-  border-radius: 4px;
-  transition: width 200ms ease, background 200ms ease;
-  width: 0%;
-}
-
-#confidenceValue {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
 /* ── Sensor toggles ── */
 
 #sensorToggles {

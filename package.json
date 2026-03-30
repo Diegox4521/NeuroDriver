@@ -1,16 +1,17 @@
 {
-  "name": "projectai2",
+  "name": "neurodriver",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AI driving simulation for sensor ablation research",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
+  "devDependencies": {
     "playwright": "^1.58.2"
   }
 }

@@ -4,13 +4,13 @@
  *   INTRO -> PRACTICE -> SENSOR_INTRO -> HUMAN_DEMO -> PRE_ABLATION_RANKING
  *     -> AI_WARMUP [-> HUMAN_DEMO_EXTRA -> AI_WARMUP]*
  *     -> AI_ABLATION (180s: Round 1 locks Speedometer ~90s, Round 2 all toggles)
- *     -> POST_ABLATION_RANKING -> REFLECTION -> DONE
+ *     -> POST_ABLATION_RANKING -> DONE
  */
 
 const GameManager = (() => {
 
   const DEV_SHORT = typeof window !== 'undefined' && window.DEV_SHORT_DEMOS;
-  const DEV_SKIP_PRACTICE = true;
+  const DEV_SKIP_PRACTICE = false;
 
   const PHASE_DURATIONS = {
     PRACTICE: DEV_SHORT ? 5 : 30,
@@ -90,19 +90,26 @@ const GameManager = (() => {
   let spaceWasDown = false;
 
   const OUTCOME_WINDOW_MS = 7000;
-  const DEGRADED_THRESHOLD_CENTER_DEV = 0.45;
+  const WOBBLE_DELTA = 0.12;
+  const WOBBLE_ABSOLUTE_FLOOR = 0.25;
+  const BASELINE_BUFFER_SIZE = 180; // ~3 seconds at 60 fps
   const MIN_DEMO_COUNT = 100;
-  /** Lower bar for warmup-retry segment (fresh buffer after KNN.reset). */
+  /** Lower bar for warmup-retry segment (fresh buffer after MLP.reset). */
   const MIN_DEMO_COUNT_EXTRA = 60;
   let outcomeWindowStart = 0;
   let outcomeWindowMaxAbsDeviation = 0;
   let crashedDuringOutcomeWindow = false;
   let outcomeResolver = null;
 
+  const baselineDevBuffer = new Float32Array(BASELINE_BUFFER_SIZE);
+  let baselineBufferIdx = 0;
+  let baselineBufferFilled = 0;
+  let baselineAvgDev = 0;
+  let outcomeWindowDevSum = 0;
+  let outcomeWindowDevCount = 0;
+
   let demoCenterDevSum = 0, demoCenterDevCount = 0, demoCrashCount = 0;
 
-  const CRASH_REPLAY_COUNT = 15;  // oversample crashes so one demo crash has noticeable but not catastrophic effect (research justification: high-consequence events represented proportionally)
-  let lastDemoSensors = null, lastDemoSteering = null;
   let demoRecordedDots = [];
   let prevDemoSteering = 0;
   /** Frames that passed / failed shouldRecord() while moving on-track (for paper: filter acceptance rate). */
@@ -218,21 +225,31 @@ const GameManager = (() => {
 
     currentPlayer = await UI.showLogin();
 
-    const progressKey = 'neuroDriver_progress_' + currentPlayer;
-    if (!localStorage.getItem(progressKey)) {
-      localStorage.setItem(progressKey, JSON.stringify({
-        laps: 0,
-        highestDemoScore: 0,
-        phasesCompleted: []
-      }));
-    }
+    try {
+      const progressKey = 'neuroDriver_progress_' + currentPlayer;
+      if (!localStorage.getItem(progressKey)) {
+        localStorage.setItem(progressKey, JSON.stringify({
+          laps: 0,
+          highestDemoScore: 0,
+          phasesCompleted: []
+        }));
+      }
+    } catch (_) { /* private browsing or storage full — non-critical */ }
 
     Logger.start();
+    Logger.setParticipant(currentPlayer, 'pilot');
     Logger.setConfig({
       sensorCount: 3,
       sensors: ['lidar', 'camera', 'speedometer'],
+      phaseDurations: { ...PHASE_DURATIONS },
+      devShortMode: !!DEV_SHORT,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      screenWidth: typeof screen !== 'undefined' ? screen.width : null,
+      screenHeight: typeof screen !== 'undefined' ? screen.height : null,
       outcomeWindowMs: OUTCOME_WINDOW_MS,
-      degradedThresholdCenterDeviation: DEGRADED_THRESHOLD_CENTER_DEV,
+      wobbleDelta: WOBBLE_DELTA,
+      wobbleAbsoluteFloor: WOBBLE_ABSOLUTE_FLOOR,
+      baselineBufferSize: BASELINE_BUFFER_SIZE,
       minDemoCount: MIN_DEMO_COUNT,
       minDemoCountExtra: MIN_DEMO_COUNT_EXTRA,
       recordIntervalMs: RECORD_INTERVAL,
@@ -302,7 +319,7 @@ const GameManager = (() => {
     UI.showDemoCount();
     UI.setDemoCount(0, MIN_DEMO_COUNT);
     UI.hideToggles();
-    KNN.reset();
+    MLP.reset();
     demoRecordedDots = [];
     Car.respawn();
     lastLapProgress = Track.lapProgress(Car.getState().x, Car.getState().y);
@@ -313,12 +330,16 @@ const GameManager = (() => {
     Logger.logPhase('PRE_ABLATION_RANKING');
     paused = true;
     UI.hideInstruction(); UI.hideBanner(); UI.hideDemoCount();
-    const ranking = await UI.showRanking(
+    const rankResult = await UI.showRanking(
       'Before the AI drives, what is your ranking of the sensors it needs most to drive safely? Make your best guess — there\'s no right answer yet.',
       'Tap each sensor in order (most important first). Use the arrows to reorder, then Submit.'
     );
-    Logger.setPreAblationRanking(ranking);
-    Logger.logEvent('pre_ablation_ranking', { ranking });
+    Logger.setPreAblationRanking(rankResult.ranking);
+    Logger.logEvent('pre_ablation_ranking', {
+      ranking: rankResult.ranking,
+      durationMs: rankResult.durationMs,
+      reorderCount: rankResult.reorderCount,
+    });
     paused = false;
     beginAIWarmup();
   }
@@ -334,10 +355,14 @@ const GameManager = (() => {
     }
     // Batch-train after all demos collected. Prevents catastrophic forgetting
     // that happens when samples arrive in sequential track order.
-    KNN.train();
+    MLP.train();
+    Logger.logEvent('mlp_trained', {
+      effectiveDemoCount: MLP.demoCount(),
+      avgDemoSpeed: +avgDemoSpeed.toFixed(4),
+    });
     await UI.showOverlay(
       'Nice driving!',
-      `The AI learned from ${KNN.demoCount()} moments of your driving. Now watch it try to drive on its own.`,
+      `The AI learned from ${MLP.demoCount()} moments of your driving. Now watch it try to drive on its own.`,
       'Watch the AI'
     );
     currentPhase = 'AI_WARMUP';
@@ -361,8 +386,8 @@ const GameManager = (() => {
     );
     paused = false;
 
-    const previousDemoCount = KNN.demoCount();
-    KNN.reset();
+    const previousDemoCount = MLP.demoCount();
+    MLP.reset();
     demoRecordedDots = [];
     demoRecordedSamples = 0;
     demoSkippedSamples = 0;
@@ -425,12 +450,16 @@ const GameManager = (() => {
     UI.hideToggles(); UI.hideBanner();
     UI.unlockSensor(2);
     Sensors.resetToggles();
-    const ranking = await UI.showRanking(
+    const rankResult = await UI.showRanking(
       'Now that you\'ve experimented, what is your ranking of the sensors your AI needs most to drive safely?',
       'Tap each sensor in order (most important first). Use the arrows to reorder, then Submit.'
     );
-    Logger.setPostAblationRanking(ranking);
-    Logger.logEvent('post_ablation_ranking', { ranking });
+    Logger.setPostAblationRanking(rankResult.ranking);
+    Logger.logEvent('post_ablation_ranking', {
+      ranking: rankResult.ranking,
+      durationMs: rankResult.durationMs,
+      reorderCount: rankResult.reorderCount,
+    });
     endSession();
   }
 
@@ -447,6 +476,8 @@ const GameManager = (() => {
       /** Pilot criterion helper: first AI warmup attempt produced a lap (no extra demo round). */
       warmupSucceededWithoutRetry: lapsWarmup > 0 && warmupRetryCount === 0,
       ablationAICrashCount,
+      mlpEffectiveDemoCount: MLP.demoCount(),
+      avgDemoSpeed: +avgDemoSpeed.toFixed(4),
       demoPhaseWallMs: Math.round(demoPhaseAccumSec),
       sessionWallMs: Math.round(Logger.sessionElapsedMs()),
       demoPhaseExtendedOnce: humanTeachingExtensionUsed,
@@ -599,16 +630,16 @@ const GameManager = (() => {
     const durationReached = phaseElapsed >= phaseDuration();
     const minDemoRequired = currentPhase === 'HUMAN_DEMO_EXTRA' ? MIN_DEMO_COUNT_EXTRA : MIN_DEMO_COUNT;
     const minSamplesMet = (currentPhase !== 'HUMAN_DEMO' && currentPhase !== 'HUMAN_DEMO_EXTRA')
-      || KNN.demoCount() >= minDemoRequired;
+      || MLP.demoCount() >= minDemoRequired;
     const outcomeWindowActive = outcomeWindowStart > 0;
 
-    if (currentPhase === 'HUMAN_DEMO' && durationReached && KNN.demoCount() < MIN_DEMO_COUNT) {
+    if (currentPhase === 'HUMAN_DEMO' && durationReached && MLP.demoCount() < MIN_DEMO_COUNT) {
       UI.showBanner('Need a few more samples — keep driving (100 required)');
     }
-    if (currentPhase === 'HUMAN_DEMO_EXTRA' && durationReached && KNN.demoCount() < MIN_DEMO_COUNT_EXTRA) {
+    if (currentPhase === 'HUMAN_DEMO_EXTRA' && durationReached && MLP.demoCount() < MIN_DEMO_COUNT_EXTRA) {
       UI.showBanner(`Need a few more samples — keep driving (${MIN_DEMO_COUNT_EXTRA} required for this round)`);
     }
-    if (currentPhase === 'HUMAN_DEMO_EXTRA' && durationReached && KNN.demoCount() >= MIN_DEMO_COUNT_EXTRA) {
+    if (currentPhase === 'HUMAN_DEMO_EXTRA' && durationReached && MLP.demoCount() >= MIN_DEMO_COUNT_EXTRA) {
       UI.hideBanner();
     }
     if (!paused && durationReached && minSamplesMet && !outcomeWindowActive) advancePhase();
@@ -616,7 +647,7 @@ const GameManager = (() => {
 
   // ── Auto demo controller (DEV mode) ──────────────────────────────────────
 
-  const DEV_AUTO_DEMO = true;
+  const DEV_AUTO_DEMO = false;
 
   function autoDemoController() {
     const car = Car.getState();
@@ -670,9 +701,7 @@ const GameManager = (() => {
 
         if (shouldRecord(sensors, labelSteering, prevDemoSteering)) {
           demoRecordedSamples++;
-          KNN.addDemonstration(sensors, labelSteering);
-          lastDemoSensors = [...sensors];
-          lastDemoSteering = labelSteering;
+          MLP.addDemonstration(sensors, labelSteering);
           demoRecordedDots.push({ x: carState.x, y: carState.y });
         } else {
           demoSkippedSamples++;
@@ -682,9 +711,9 @@ const GameManager = (() => {
         demoCenterDevCount += 1;
       }
       prevDemoSteering = labelSteering;
-      Logger.logFrame(currentPhase, carState, sensors, sensors, Sensors.getToggleMask(), null);
+      Logger.logFrame(currentPhase, carState, sensors, sensors, Sensors.getToggleMask(), null, { humanSteering: smoothedSteering });
       const minReq = currentPhase === 'HUMAN_DEMO_EXTRA' ? MIN_DEMO_COUNT_EXTRA : MIN_DEMO_COUNT;
-      UI.setDemoCount(KNN.demoCount(), minReq);
+      UI.setDemoCount(MLP.demoCount(), minReq);
       lastRecordTime = now;
     }
   }
@@ -710,15 +739,13 @@ const GameManager = (() => {
     const sensorsRaw = Sensors.rawValues(carState);   // unmasked, for throttle
     const sensorsMasked = Sensors.compute(carState);     // masked by toggles, for steering
 
-    console.assert(
-      Array.isArray(sensorsMasked) &&
-      sensorsMasked.length === 6 &&
-      sensorsMasked.every(v => typeof v === 'number' && !isNaN(v)),
-      'invalid sensor vector'
-    );
+    if (!Array.isArray(sensorsMasked) || sensorsMasked.length !== 6 ||
+        sensorsMasked.some(v => typeof v !== 'number' || isNaN(v))) {
+      console.warn('invalid sensor vector, skipping AI frame');
+      return;
+    }
 
-    const result = KNN.predict(sensorsMasked);
-    const resultRaw = KNN.predict(sensorsRaw);
+    const result = MLP.predict(sensorsMasked);
     lastAIResult = result;
 
     const steer = Math.max(-1, Math.min(1, result.steering));
@@ -747,14 +774,21 @@ const GameManager = (() => {
 
 
 
+    const dev = Track.centerDeviation(carState.x, carState.y);
+    const absDev = Math.abs(dev);
+
+    baselineDevBuffer[baselineBufferIdx] = absDev;
+    baselineBufferIdx = (baselineBufferIdx + 1) % BASELINE_BUFFER_SIZE;
+    if (baselineBufferFilled < BASELINE_BUFFER_SIZE) baselineBufferFilled++;
+
     if (outcomeWindowStart > 0 && (now - outcomeWindowStart) < OUTCOME_WINDOW_MS) {
-      const dev = Track.centerDeviation(carState.x, carState.y);
-      const absDev = Math.abs(dev);
       outcomeWindowMaxAbsDeviation = Math.max(outcomeWindowMaxAbsDeviation, absDev);
+      outcomeWindowDevSum += absDev;
+      outcomeWindowDevCount++;
     }
 
     if (now - lastLogTime > LOG_INTERVAL) {
-      Logger.logFrame(currentPhase, carState, sensorsRaw, sensorsMasked, Sensors.getToggleMask(), result);
+      Logger.logFrame(currentPhase, carState, sensorsRaw, sensorsMasked, Sensors.getToggleMask(), result, { centerDev: dev });
       lastLogTime = now;
     }
   }
@@ -801,7 +835,7 @@ const GameManager = (() => {
         const laps = Logger.getLapCountForPhase('AI_WARMUP');
         if (laps === 0 && warmupRetryCount < MAX_WARMUP_RETRIES) {
           warmupRetryCount++;
-          Logger.logEvent('warmup_fail', { retries: warmupRetryCount, demoCount: KNN.demoCount() });
+          Logger.logEvent('warmup_fail', { retries: warmupRetryCount, demoCount: MLP.demoCount() });
           beginHumanDemoExtra();
         } else {
           if (laps === 0) Logger.logEvent('warmup_skip', { retries: warmupRetryCount });
@@ -829,10 +863,12 @@ const GameManager = (() => {
     const lapProg = Track.lapProgress(Car.getState().x, Car.getState().y);
 
     let predictionChoice = null;
+    let predictionResponseMs = null;
 
     if (!newState) {
-      // Game remains paused while modal is awaited, so no background crashes!
-      predictionChoice = await UI.showPrediction(sensorName, sensorIndex);
+      const predResult = await UI.showPrediction(sensorName, sensorIndex);
+      predictionChoice = predResult.choice;
+      predictionResponseMs = predResult.responseMs;
       UI.showBanner(`Experiment running: ${sensorName} is OFF. Watch what happens.`);
       UI.setTogglesDisabled(true);
 
@@ -845,30 +881,40 @@ const GameManager = (() => {
     UI.applySensorBtnState(sensorIndex, newState);
 
     const newSensors = Sensors.compute(Car.getState());
-    const confAfter = KNN.predict(newSensors).confidence;
+    const confAfter = MLP.predict(newSensors).confidence;
 
     paused = false;
 
     if (predictionChoice) {
+      let sum = 0;
+      for (let i = 0; i < baselineBufferFilled; i++) sum += baselineDevBuffer[i];
+      baselineAvgDev = baselineBufferFilled > 0 ? sum / baselineBufferFilled : 0;
+
       outcomeWindowStart = performance.now();
       outcomeWindowMaxAbsDeviation = 0;
+      outcomeWindowDevSum = 0;
+      outcomeWindowDevCount = 0;
       crashedDuringOutcomeWindow = false;
 
       outcomeResolver = () => {
         const stateNow = Car.getState();
+        const postAvgDev = outcomeWindowDevCount > 0
+          ? outcomeWindowDevSum / outcomeWindowDevCount : 0;
+        const delta = postAvgDev - baselineAvgDev;
+
         let outcome;
         if (stateNow.crashed || crashedDuringOutcomeWindow) {
           outcome = 'crash';
-        } else if (outcomeWindowMaxAbsDeviation > DEGRADED_THRESHOLD_CENTER_DEV) {
+        } else if (delta > WOBBLE_DELTA && postAvgDev > WOBBLE_ABSOLUTE_FLOOR) {
           outcome = 'slow';
         } else {
           outcome = 'fine';
         }
-        const confAtOutcome = KNN.predict(Sensors.compute(stateNow)).confidence;
+        const confAtOutcome = MLP.predict(Sensors.compute(stateNow)).confidence;
         outcomeWindowStart = 0;
         crashedDuringOutcomeWindow = false;
         outcomeResolver = null;
-        Logger.logToggle(sensorIndex, sensorName, newState, predictionChoice, outcome, confBefore, confAtOutcome, lapProg, OUTCOME_WINDOW_MS, ablationRound);
+        Logger.logToggle(sensorIndex, sensorName, newState, predictionChoice, outcome, confBefore, confAtOutcome, lapProg, OUTCOME_WINDOW_MS, ablationRound, baselineAvgDev, postAvgDev, delta, outcomeWindowMaxAbsDeviation, predictionResponseMs);
 
         const match = predictionChoice === outcome;
         UI.showBanner(`You predicted: ${OUTCOME_LABELS[predictionChoice]}. Result: ${OUTCOME_LABELS[outcome]}. ${match ? '✓ Correct!' : '✗ Different than expected.'}`);
@@ -882,7 +928,7 @@ const GameManager = (() => {
       }, OUTCOME_WINDOW_MS);
     } else {
       UI.setTogglesDisabled(false);
-      Logger.logToggle(sensorIndex, sensorName, newState, null, null, confBefore, confAfter, lapProg, null, ablationRound);
+      Logger.logToggle(sensorIndex, sensorName, newState, null, null, confBefore, confAfter, lapProg, null, ablationRound, null, null, null, null, null);
       isToggling = false;
     }
   }

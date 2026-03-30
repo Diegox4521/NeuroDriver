@@ -111,10 +111,9 @@ The AI uses a small **neural network** trained via **behavior cloning** — it c
 **Output:** Steering in [−1, 1] via tanh, scaled by 1.2× at inference to help the AI commit to turns, then clamped.
 
 **Training enhancements:**
-- Gaussian noise (±0.04) added to inputs during training, clamped to [0, 1]
+- Uniform noise (±0.01) added to inputs during training, clamped to [0, 1]
 - Graduated turn oversampling: moderate turns (|steer| > 0.15) get 1 extra copy, sharp turns (|steer| > 0.4) get 2 extra copies
-- Near-wall oversampling: when leftNear or rightNear < 0.3, sample is duplicated
-- Crash oversampling: 15× replay of the last demo frame before a crash
+- Near-wall oversampling: when leftNear or rightNear < 0.3 (or forward < 0.25 with both sides < 0.6), sample is duplicated
 
 **Inference input clamping:** All inputs clamped to [0, 1] at inference to prevent edge-case instability.
 
@@ -140,7 +139,7 @@ The "Got it!" button is locked for 8 seconds to ensure participants read the des
 
 The student drives again, but now the game is recording. A "Samples" counter shows progress toward the minimum of 100 demonstration points. The label says *"Phase 1: Teach the AI"* and an instruction reads *"Drive carefully — the AI is learning from you!"*
 
-The AI records sensor readings and steering at 10 Hz, but only when the car is on the track and moving. A smart recording filter prioritizes corner data and rejects near-wall noise and stationary frames. If the student crashes, the last demo frame is replayed 15× for crash-recovery learning.
+The AI records sensor readings and steering at 10 Hz, but only when the car is on the track and moving. A smart recording filter prioritizes corner data and rejects stationary frames.
 
 The phase doesn't end until both 2 minutes have passed **and** at least 100 samples have been recorded.
 
@@ -371,11 +370,11 @@ NeuroDriver is a 10-minute, browser-based research game that teaches 8th graders
 
 ### A.1 Technology
 
-Browser-only (HTML5 + Canvas + vanilla JavaScript). No frameworks, no backend. 8 JS files + HTML + CSS. Runs on Chromebooks.
+Browser-based (HTML5 + Canvas + vanilla JavaScript). A lightweight Node.js server (`server.js`) serves static files and saves session data to a local `data/` directory. No frameworks required. 8 JS files + HTML + CSS. Runs on Chromebooks. Start with `npm start`.
 
 ### A.2 AI Model
 
-MLP (6→64→1), ReLU hidden activation, tanh output. He initialization, LR=0.005, 120 epochs, batch training with shuffle. Behavior cloning with graduated turn oversampling and near-wall oversampling. Training noise ±0.04 (clamped). Inference output scaled 1.2× and clamped to [−1, 1].
+MLP (6→64→1), ReLU hidden activation, tanh output. He initialization, LR=0.005, 120 epochs, batch training with shuffle. Behavior cloning with graduated turn oversampling and near-wall oversampling. Training noise ±0.01 uniform (clamped). Inference output scaled 1.2× and clamped to [−1, 1].
 
 ### A.3 Sensors
 
@@ -393,7 +392,7 @@ MLP (6→64→1), ReLU hidden activation, tanh output. He initialization, LR=0.0
 After a sensor is turned off, a 7-second observation window classifies the result:
 
 1. **Crash** — car left the track at any point during the window
-2. **Wobble** — max center deviation exceeded 0.75
+2. **Wobble** — average center deviation during the window exceeds the pre-toggle baseline by more than 0.12 (delta), **and** the absolute average deviation exceeds 0.25 (floor)
 3. **Fine** — none of the above
 
 Priority: crash > wobble > fine.
@@ -429,8 +428,9 @@ Single JSON file per session. Contains: all config parameters, frame-by-frame ca
 | `js/track.js` | Track geometry, centerline, collision |
 | `js/car.js` | Car physics |
 | `js/sensors.js` | 6D sensor computation and visualization |
-| `js/knn.js` | MLP model (6→64→1, behavior cloning) |
+| `js/mlp.js` | MLP model (6→64→1, behavior cloning) |
 | `js/gameManager.js` | Phase state machine, ablation logic, throttle controller |
 | `js/logger.js` | Data collection and JSON export |
 | `js/ui.js` | Overlays, modals, ranking widget, prediction prompts |
 | `js/main.js` | Game loop, rendering, initialization |
+| `server.js` | Static file server + JSON data save endpoint |
