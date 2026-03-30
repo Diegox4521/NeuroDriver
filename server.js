@@ -20,7 +20,8 @@ const MIME_TYPES = {
 };
 
 function serveStatic(req, res) {
-  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  const urlPath = req.url.split('?')[0];
+  let filePath = path.join(__dirname, urlPath === '/' ? 'index.html' : urlPath);
   filePath = path.normalize(filePath);
 
   // Prevent path traversal outside project root
