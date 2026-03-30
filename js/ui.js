@@ -23,7 +23,6 @@ const UI = (() => {
   const predModal         = () => $('#predictionModal');
   const predQuestion      = () => $('#predictionQuestion');
   const predChoices       = () => $('#predictionChoices');
-  const reflModal         = () => $('#reflectionModal');
   const instructionsEl    = () => $('#instructions');
   const instructionText   = () => $('#instructionText');
   const miniHud           = () => $('#miniHud');
@@ -345,8 +344,6 @@ const UI = (() => {
       predModal().classList.remove('hidden');
     });
   }
-
-  // ── Reflection modal ──
 
   // ── Instructions toast ──
 
