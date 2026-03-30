@@ -347,7 +347,15 @@ const GameManager = (() => {
     paused = false;
   }
 
-  function beginHumanDemoExtra() {
+  async function beginHumanDemoExtra() {
+    paused = true;
+    await UI.showOverlay(
+      'More Data Needed',
+      'The AI crashed too much and couldn\'t finish a lap. Let\'s clear its memory and try teaching it again with better driving data!',
+      'Activating Manual Control'
+    );
+    paused = false;
+
     const previousDemoCount = KNN.demoCount();
     KNN.reset();
     demoRecordedDots = [];
@@ -434,7 +442,7 @@ const GameManager = (() => {
       /** Pilot criterion helper: first AI warmup attempt produced a lap (no extra demo round). */
       warmupSucceededWithoutRetry: lapsWarmup > 0 && warmupRetryCount === 0,
       ablationAICrashCount,
-      demoPhaseWallMs: Math.round(demoPhaseAccumSec * 1000),
+      demoPhaseWallMs: Math.round(demoPhaseAccumSec),
       sessionWallMs: Math.round(Logger.sessionElapsedMs()),
       demoPhaseExtendedOnce: humanTeachingExtensionUsed,
       demoPhaseBonusMs: humanTeachingBonusMs,
@@ -579,11 +587,11 @@ const GameManager = (() => {
     lastLapProgress = currentLapProgress;
 
     if (currentPhase === 'PRACTICE') {
-      updatePractice(now);
+      updatePractice(dt, now);
     } else if (currentPhase === 'HUMAN_DEMO' || currentPhase === 'HUMAN_DEMO_EXTRA') {
-      updateHumanDriving(now);
+      updateHumanDriving(dt, now);
     } else if (currentPhase === 'AI_WARMUP' || currentPhase === 'AI_ABLATION') {
-      updateAIDriving(now);
+      updateAIDriving(dt, now);
     }
 
     const durationReached = phaseElapsed >= phaseDuration();
@@ -630,10 +638,12 @@ const GameManager = (() => {
 
   // ── Human driving + demo recording ───────────────────────────────────────
 
-  function updateHumanDriving(now) {
+  function updateHumanDriving(dt, now) {
     if (!DEV_AUTO_DEMO) {
+      const dtScale = Math.min(dt / 16.6666, 3.0);
+      const smoothFactor = Math.min(1.0, STEER_SMOOTH * dtScale);
       const target = steerTargetFromKeys();
-      smoothedSteering += (target - smoothedSteering) * STEER_SMOOTH;
+      smoothedSteering += (target - smoothedSteering) * smoothFactor;
       Car.setSteering(smoothedSteering);
       Car.setThrottle(throttleFromKeys());
     } else {
@@ -679,9 +689,11 @@ const GameManager = (() => {
 
   // ── Practice ─────────────────────────────────────────────────────────────
 
-  function updatePractice(now) {
+  function updatePractice(dt, now) {
+    const dtScale = Math.min(dt / 16.6666, 3.0);
+    const smoothFactor = Math.min(1.0, STEER_SMOOTH * dtScale);
     const target = steerTargetFromKeys();
-    smoothedSteering += (target - smoothedSteering) * STEER_SMOOTH;
+    smoothedSteering += (target - smoothedSteering) * smoothFactor;
     Car.setSteering(smoothedSteering);
     Car.setThrottle(throttleFromKeys());
     Sensors.compute(Car.getState());
@@ -691,7 +703,7 @@ const GameManager = (() => {
 
   // ── AI driving ───────────────────────────────────────────────────────────
 
-  function updateAIDriving(now) {
+  function updateAIDriving(dt, now) {
     const carState = Car.getState();
     const sensorsRaw = Sensors.rawValues(carState);   // unmasked, for throttle
     const sensorsMasked = Sensors.compute(carState);     // masked by toggles, for steering
@@ -709,7 +721,9 @@ const GameManager = (() => {
 
     const steer = Math.max(-1, Math.min(1, result.steering));
     const spdOff = !Sensors.getToggleMask()[2];
-    const smoothFactor = spdOff ? AI_STEER_SMOOTH_NO_SPD : AI_STEER_SMOOTH;
+    const baseSmooth = spdOff ? AI_STEER_SMOOTH_NO_SPD : AI_STEER_SMOOTH;
+    const dtScale = Math.min(dt / 16.6666, 3.0);
+    const smoothFactor = Math.min(1.0, baseSmooth * dtScale);
     aiSmoothedSteering += (steer - aiSmoothedSteering) * smoothFactor;
     aiSmoothedSteering = Math.max(-1.0, Math.min(1.0, aiSmoothedSteering));
     Car.setSteering(aiSmoothedSteering);

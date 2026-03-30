@@ -52,19 +52,21 @@ const Car = (() => {
       return;
     }
 
+    const dtScale = dt / 16.6666;
+
     // Throttle / friction
     const t = Math.max(0, Math.min(1, throttle));
-    if (t > 0) speed = Math.min(MAX_SPEED, speed + ACCEL * t);
-    else speed = Math.max(0, speed - FRICTION);
+    if (t > 0) speed = Math.min(MAX_SPEED, speed + ACCEL * t * dtScale);
+    else speed = Math.max(0, speed - FRICTION * dtScale);
 
     // Steering at low speed: avoid near-zero turn when speed/MAX_SPEED is tiny
     if (speed > 0.05) {
       const speedFactor = Math.max(0.3, speed / MAX_SPEED);
-      heading += steering * TURN_RATE * speedFactor;
+      heading += steering * TURN_RATE * speedFactor * dtScale;
     }
 
-    x += Math.cos(heading) * speed;
-    y += Math.sin(heading) * speed;
+    x += Math.cos(heading) * speed * dtScale;
+    y += Math.sin(heading) * speed * dtScale;
 
     // Wall collision
     if (!Track.isOnTrack(x, y)) {

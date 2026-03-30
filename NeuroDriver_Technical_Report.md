@@ -126,9 +126,9 @@ The AI uses a small **neural network** trained via **behavior cloning** — it c
 
 ## 5. Complete Session Walkthrough
 
-### Phase 1: Practice (up to 30 seconds)
+### Phase 1: Practice (30 seconds)
 
-The student sees a 2D top-down race track with a small car. They drive with arrow keys or WASD to get comfortable. An instruction line says: *"Your car has three sensors: LiDAR, Camera, and Speedometer. Press SPACE when ready."*
+The student sees a 2D top-down race track with a small car. They drive with arrow keys or WASD to get comfortable. An instruction line says: *"Practice driving! Use ↑ to accelerate and ← → to steer."* The student drives for the full 30 seconds to ensure basic competency before moving on.
 
 ### Phase 2: Sensor Introduction (up to 30 seconds)
 
