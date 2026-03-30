@@ -10,9 +10,9 @@
 
 NeuroDriver is a **browser-based driving game** that teaches 8th-grade students how artificial intelligence works by letting them **train an AI, watch it drive, and then break it on purpose.**
 
-The game takes about **10 minutes** to play. It requires no installation, no accounts, and no internet connection after the page loads. A student opens a URL, plays through a guided sequence, and at the end the game exports a single JSON file containing everything that happened during the session — every prediction the student made, every sensor they turned off, every crash, every reflection answer.
+The game takes about **10 minutes** to play. It requires no installation, no accounts, and no internet connection after the page loads. A student opens a URL, plays through a guided sequence, and at the end the game exports a single JSON file containing everything that happened during the session — every prediction the student made, every sensor they turned off, and every crash.
 
-The AI is **fully transparent**: students can see exactly what inputs the AI uses (three sensors), how confident it is (a visible confidence bar), and what happens when they remove an input. There is no hidden magic. The AI is a small neural network (MLP) trained via behavior cloning on the student's own driving. When it fails, the student can trace the failure back to a specific sensor they disabled.
+The AI is **fully transparent**: students can see exactly what inputs the AI uses (three sensors), and what happens when they remove an input. There is no hidden magic. The AI is a small neural network (MLP) trained via behavior cloning on the student's own driving. When it fails, the student can trace the failure back to a specific sensor they disabled.
 
 The game is designed as a **research instrument** — every design decision serves both a learning goal and a data collection goal. It is framed as a **design and feasibility study** with pilot data, suitable for venues like SIGCSE, IDC, EAAI, or ICER.
 
@@ -33,7 +33,7 @@ The game targets two ideas from the AI4K12 framework:
 
 After playing, students should be able to answer: **"What happens to an AI when it loses one of its inputs, and why does that matter?"**
 
-This is tested through prediction accuracy (did they correctly guess what would happen?), ranking shift (did their beliefs about which sensor matters most change after experimenting?), and written reflection (can they explain *why* a sensor matters?).
+This is tested through prediction accuracy (did they correctly guess what would happen?), and ranking shift (did their beliefs about which sensor matters most change after experimenting?).
 
 ### 2.3 Pedagogical Framework: Predict-Observe-Explain (POE)
 
@@ -41,7 +41,7 @@ Every experiment in the game follows the **Predict-Observe-Explain** cycle from 
 
 1. **Predict:** Before turning off a sensor, the student picks what they think will happen (Drive fine / Wobble / Crash)
 2. **Observe:** They watch the AI drive without that sensor for a 7-second observation window
-3. **Explain:** The game shows their prediction next to the actual result ("You predicted: Drove fine. Result: Crashed. Different than expected."), and at the end of the session a reflection form asks them to explain *why*
+3. **Explain:** The game shows their prediction next to the actual result ("You predicted: Drove fine. Result: Crashed. Different than expected.")
 
 This loop runs every time a student turns off a sensor. A student who experiments with all three sensors completes 3+ POE cycles in a single 10-minute session.
 
@@ -85,17 +85,17 @@ The AI uses a small **neural network** trained via **behavior cloning** — it c
 
 1. **Training phase:** While the student drives, the game records a snapshot every 0.1 seconds: "at this moment, the six sensor readings were [0.8, 0.7, 0.6, 0.5, 0.9, 0.4] and the student was steering [0.3 to the right]." After 2 minutes, the game has hundreds of these snapshots.
 
-2. **Training:** After the demo phase, the neural network trains on all collected snapshots for 80 epochs with shuffling each epoch. This batch training approach prevents the model from forgetting earlier track sections.
+2. **Training:** After the demo phase, the neural network trains on all collected snapshots for 120 epochs with shuffling each epoch. This batch training approach prevents the model from forgetting earlier track sections.
 
 3. **Driving phase:** When the AI needs to decide how to steer, it feeds the current sensor readings through the neural network and gets a steering value. A proportional speed controller targets the student's demonstrated speed and adapts to road geometry using the forward sensor.
 
-4. **Confidence:** The system measures input similarity to training data using K-nearest-neighbor distance. If the current situation is very similar to something the student demonstrated, confidence is high. If it's far away (the AI is in unfamiliar territory), confidence is low. This is shown as a visible "AI Certainty" bar.
+4. **Confidence:** The system measures input similarity to training data using K-nearest-neighbor distance. If the current situation is very similar to something the student demonstrated, confidence is high. If it's far away (the AI is in unfamiliar territory), confidence is low.
 
 5. **Ablation:** When a sensor is turned off, its value is set to 0. The neural network still runs — but now with distorted inputs, it produces different steering outputs. This is the behavioral change students observe.
 
 ### 4.2 Technical
 
-**Architecture:** MLP with 6 inputs → 64 hidden units (ReLU) → 1 output (tanh). He initialization. Learning rate 0.005, 80 epochs.
+**Architecture:** MLP with 6 inputs → 64 hidden units (ReLU) → 1 output (tanh). He initialization. Learning rate 0.005, 120 epochs.
 
 **Input vector (6D):**
 
@@ -134,7 +134,7 @@ The student sees a 2D top-down race track with a small car. They drive with arro
 
 A full-screen modal shows all three sensors. Each panel has a name and a one-sentence description using real-world analogies (e.g., "LiDAR — Fires side lasers to measure distance to walls").
 
-A countdown shows "Auto-continues in 28s..." and a "Got it!" button lets the student advance early.
+The "Got it!" button is locked for 8 seconds to ensure participants read the descriptions before they can advance.
 
 ### Phase 3: Teach the AI (2 minutes)
 
@@ -154,7 +154,7 @@ The student clicks sensors in order (1st, 2nd, 3rd). Arrow buttons allow reorder
 
 An overlay says: *"The AI learned from [N] moments of your driving. Now watch it try to drive on its own."*
 
-The AI drives with all three sensors active. A confidence bar shows AI certainty. If the AI can't complete a single lap, the student is sent back for 45 more seconds of driving, then warmup repeats (capped at 3 retries).
+The AI drives with all three sensors active. If the AI can't complete a single lap, the student is sent back for 45 more seconds of driving, then warmup repeats (capped at 3 retries).
 
 ### Phase 6: Sensor Experiments (3 minutes, two rounds)
 
@@ -177,19 +177,9 @@ The same ranking widget with a different prompt: *"Now that you've experimented,
 
 This is the **post-test**. The shift between pre and post rankings is the primary measure of conceptual change.
 
-### Phase 8: Reflection (untimed)
+### Phase 8: Done
 
-A reflection form asks three required questions:
-
-- **Q1:** Which sensor surprised you most? (dropdown: LiDAR / Camera / Speedometer / None)
-- **Q2:** How surprised were you? (3-point scale: Not / A little / Very)
-- **Q3:** Pick one sensor. What information does it give the AI, and what does the AI have to guess without it? (dropdown + free-text)
-
-The student can click "Skip" to bypass reflection (logged as `skipped: true`).
-
-### Phase 9: Done
-
-A final overlay thanks the student. Clicking "Download Data" saves the complete session as a JSON file.
+A final overlay thanks the student. The session's JSON data is automatically exported to a local server in the background, and clicking "Finish & Reset" reloads the game for the next student.
 
 ---
 
@@ -201,7 +191,6 @@ A final overlay thanks the student. Clicking "Download Data" saves the complete 
 |---|---|---|
 | **Prediction accuracy** | Did the student correctly predict what would happen when a sensor was turned off? | Each toggle event records the prediction and the actual outcome |
 | **Conceptual change (ranking shift)** | Did the student's beliefs about sensor importance change after experimenting? | Pre-ablation ranking vs. post-ablation ranking (ordered arrays of 3 sensor names) |
-| **Functional explanation quality** | Can the student explain *why* a sensor matters in mechanistic terms? | Q3 free-text response, coded for mechanistic vs. surface-level understanding |
 
 ### 6.2 Secondary and Exploratory Measures
 
@@ -221,7 +210,6 @@ Each session produces a single JSON file (data format v4.0) containing:
 - **Frame data (~10 Hz):** car position, sensor values (raw and masked), AI steering and confidence
 - **Toggle events:** which sensor, on/off, prediction, outcome, confidence before/after, ablation round, lap position
 - **Rankings:** pre and post ablation (ordered arrays of sensor names)
-- **Reflection:** all Q1–Q3 responses
 - **Performance:** lap counts, crash counts, demo quality metrics, feasibility metrics
 
 All configuration parameters (outcome window duration, deviation thresholds, sensor ranges, etc.) are embedded in the export for full reproducibility.
@@ -269,11 +257,10 @@ This is a **design and feasibility study** with pilot data. There is no control 
 1. Can 8th graders complete the full session in ~10 minutes?
 2. Do they produce enough toggle events (3+ per student) for meaningful prediction accuracy analysis?
 3. Does the pre/post ranking shift capture measurable conceptual change?
-4. Are the reflection instruments usable (completion rate, response quality)?
 
 Causal learning claims are reserved for a future study with a comparison condition and larger N.
 
-**Feasibility criteria (pre-registered):** The pilot will be considered feasible if: (1) ≥ 80% of students complete the full session within 10 minutes, (2) the median number of toggle events per student is ≥ 3, (3) the reflection completion rate (non-skip) is ≥ 60%, and (4) the AI completes at least one warmup lap without retry in ≥ 75% of sessions.
+**Feasibility criteria (pre-registered):** The pilot will be considered feasible if: (1) ≥ 80% of students complete the full session within 10 minutes, (2) the median number of toggle events per student is ≥ 3, and (3) the AI completes at least one warmup lap without retry in ≥ 75% of sessions.
 
 ### 8.2 Participants
 
@@ -287,7 +274,7 @@ Causal learning claims are reserved for a future study with a comparison conditi
 | Venue | Framing |
 |---|---|
 | **SIGCSE** (Tools, Experience Reports) | Tool paper describing the system and pilot results |
-| **IDC** (Interaction Design and Children) | Design paper focused on the sensor introduction, POE loop, and reflection instrument |
+| **IDC** (Interaction Design and Children) | Design paper focused on the sensor introduction and POE loop |
 | **EAAI** (Educational Advances in AI) | AI literacy intervention with transparent ML model |
 | **ICER** | Pilot study establishing measures and hypotheses for a larger experiment |
 
@@ -299,7 +286,6 @@ Causal learning claims are reserved for a future study with a comparison conditi
 | Ordinal accuracy | Score 2/1/0 (exact match / adjacent / opposite), analyzed with ordinal regression |
 | Ranking shift | Kendall tau distance, tested against 0 with exact permutation test (3! = 6 possible orderings) |
 | Ranking alignment with ground truth | Spearman correlation of post-ranking with expert ordering |
-| Reflection quality | Qualitative coding of Q3 for mechanistic / functional / surface-level |
 | Round 1 vs. Round 2 accuracy | Within-subjects paired comparison using McNemar test on correct/incorrect per round |
 
 ---
@@ -354,7 +340,6 @@ AI throttle is governed by a proportional speed-matching controller, **not the l
 | Outcome threshold (wobble vs. fine) is heuristic | Report sensitivity analysis across multiple thresholds |
 | Driving quality varies between students | Demo quality metrics are logged and used as covariates |
 | No teacher scaffolding built in | Facilitation guide recommended for deployment |
-| Confidence bar could cue predictions | Hidden during outcome window to reduce this confound |
 | MLP is stateless (no memory) | Creates interpretable, consistent failure modes suitable for the study |
 
 ---
@@ -370,16 +355,15 @@ AI throttle is governed by a proportional speed-matching controller, **not the l
 | AI Warmup | 0:45 | 3:50 |
 | Sensor Experiments | 3:00 | 6:50 |
 | Post-Ablation Ranking | ~15 s | 7:05 |
-| Reflection | ~60 s | 8:05 |
-| Done screen | ~10 s | 8:15 |
+| Done screen | ~10 s | 7:15 |
 
-**Total: ~8 minutes** for a focused student. With warmup retries (worst case +135 s) and slow readers, budget **10 minutes**.
+**Total: ~7 minutes** for a focused student. With warmup retries (worst case +135 s) and slow readers, budget **10 minutes**.
 
 ---
 
 ## 11. Summary
 
-NeuroDriver is a 10-minute, browser-based research game that teaches 8th graders how AI uses sensor inputs, what happens when those inputs fail, and why that matters for safety. Students train an AI by driving, experiment by turning sensors off and predicting consequences, and reflect on what they observed. The game logs every interaction in a structured JSON file, supporting three pre-registered hypotheses about prediction accuracy, conceptual change, and sensor-specific understanding. It is designed as a feasibility study and pilot for a larger experiment.
+NeuroDriver is a 10-minute, browser-based research game that teaches 8th graders how AI uses sensor inputs, what happens when those inputs fail, and why that matters for safety. Students train an AI by driving, and experiment by turning sensors off and predicting consequences. The game logs every interaction in a structured JSON file, supporting three pre-registered hypotheses about prediction accuracy, conceptual change, and sensor-specific understanding. It is designed as a feasibility study and pilot for a larger experiment.
 
 ---
 
@@ -391,7 +375,7 @@ Browser-only (HTML5 + Canvas + vanilla JavaScript). No frameworks, no backend. 8
 
 ### A.2 AI Model
 
-MLP (6→64→1), ReLU hidden activation, tanh output. He initialization, LR=0.005, 80 epochs, batch training with shuffle. Behavior cloning with graduated turn oversampling and near-wall oversampling. Training noise ±0.04 (clamped). Inference output scaled 1.2× and clamped to [−1, 1].
+MLP (6→64→1), ReLU hidden activation, tanh output. He initialization, LR=0.005, 120 epochs, batch training with shuffle. Behavior cloning with graduated turn oversampling and near-wall oversampling. Training noise ±0.04 (clamped). Inference output scaled 1.2× and clamped to [−1, 1].
 
 ### A.3 Sensors
 
@@ -434,7 +418,7 @@ AI steering output is low-pass filtered (α = 0.085) to prevent jitter. When Spe
 
 ### A.7 Data Export (v4.0)
 
-Single JSON file per session. Contains: all config parameters, frame-by-frame car/sensor data at ~10 Hz, every toggle event (sensor, prediction, outcome, confidence, round, lap position), rankings (pre and post), reflection (Q1–Q3), crashes, laps, demo quality metrics, feasibility metrics.
+Single JSON file per session. Contains: all config parameters, frame-by-frame car/sensor data at ~10 Hz, every toggle event (sensor, prediction, outcome, confidence, round, lap position), rankings (pre and post), crashes, laps, demo quality metrics, feasibility metrics.
 
 ### A.8 File Manifest
 
@@ -448,5 +432,5 @@ Single JSON file per session. Contains: all config parameters, frame-by-frame ca
 | `js/knn.js` | MLP model (6→64→1, behavior cloning) |
 | `js/gameManager.js` | Phase state machine, ablation logic, throttle controller |
 | `js/logger.js` | Data collection and JSON export |
-| `js/ui.js` | Overlays, modals, ranking widget, prediction prompts, reflection form |
+| `js/ui.js` | Overlays, modals, ranking widget, prediction prompts |
 | `js/main.js` | Game loop, rendering, initialization |
