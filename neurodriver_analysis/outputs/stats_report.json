@@ -1,0 +1,126 @@
+{
+  "cohort": {
+    "n_sessions": 69,
+    "n_post_survey": 77,
+    "n_matched_pre_post": 77
+  },
+  "sensor_drops": {
+    "LiDAR": {
+      "n": 67,
+      "mean_drop_pp": 25.56407115385118,
+      "std_drop_pp": 4.636705342402796,
+      "pct_positive": 100.0,
+      "pct_negative": 0.0
+    },
+    "Camera": {
+      "n": 67,
+      "mean_drop_pp": 14.407805388855968,
+      "std_drop_pp": 4.490858520514547,
+      "pct_positive": 100.0,
+      "pct_negative": 0.0
+    },
+    "Speedometer": {
+      "n": 58,
+      "mean_drop_pp": 13.151412211312733,
+      "std_drop_pp": 8.795921113502803,
+      "pct_positive": 96.55172413793103,
+      "pct_negative": 3.4482758620689653
+    }
+  },
+  "lidar_dominance": {
+    "n_cohort": 69,
+    "n_with_data": 69,
+    "lidar_dominant_count": 61,
+    "lidar_dominant_pct": 88.40579710144928,
+    "distribution": {
+      "LiDAR": 61,
+      "Speedometer": 5,
+      "Camera": 3
+    }
+  },
+  "ranking_change": {
+    "n": 69,
+    "changed": 49,
+    "rate_pct": 71.01449275362319
+  },
+  "kendall_tau": {
+    "n": 69,
+    "mean_pre_tau_to_truth": 1.0869565217391304,
+    "mean_post_tau_to_truth": 0.6231884057971014,
+    "mean_pre_to_post_tau": 1.1884057971014492,
+    "expected_random_tau": 1.5,
+    "shift_toward_truth_pp": 15.45893719806763
+  },
+  "demo_to_ai_crash_corr": {
+    "r": 0.45290574287981306,
+    "p": 9.32370054617481e-05,
+    "n": 69
+  },
+  "composite_score": {
+    "n": 77,
+    "mean_pct": 65.25974025974025,
+    "std_pct": 23.585828296306985,
+    "median_pct": 74.99999999999999
+  },
+  "mcnemar_q34_q22": {
+    "test": "McNemar (continuity-corrected)",
+    "chi2": 5.882352941176471,
+    "p": 0.01529337103019901,
+    "n": 74,
+    "pre_correct_post_wrong": 3,
+    "pre_wrong_post_correct": 14,
+    "both_correct": 47,
+    "both_wrong": 10,
+    "pre_pct": 67.56756756756756,
+    "post_pct": 82.43243243243244,
+    "gain_pp": 14.864864864864868
+  },
+  "survey_confidence_corr": {
+    "r": 0.17260571196919547,
+    "p": 0.15926620779176642,
+    "n": 68
+  },
+  "conceptual_change_by_style": {
+    "Boom-or-Bust": {
+      "n": 4,
+      "changed": 3,
+      "rate_pct": 75.0
+    },
+    "Crash-Heavy": {
+      "n": 10,
+      "changed": 6,
+      "rate_pct": 60.0
+    },
+    "Fast & Clean": {
+      "n": 28,
+      "changed": 19,
+      "rate_pct": 67.85714285714286
+    },
+    "Mostly Straight": {
+      "n": 10,
+      "changed": 9,
+      "rate_pct": 90.0
+    },
+    "Wavy/Oscillating": {
+      "n": 16,
+      "changed": 11,
+      "rate_pct": 68.75
+    }
+  },
+  "changers_vs_nonchangers_ttest": {
+    "changers": {
+      "n": 48,
+      "mean_pct": 62.49999999999999,
+      "std_pct": 23.881603155298002
+    },
+    "non_changers": {
+      "n": 20,
+      "mean_pct": 71.24999999999999,
+      "std_pct": 21.540625292959714
+    },
+    "t_stat": -1.477294163787956,
+    "p_val": 0.14757031685547098,
+    "cohens_d": -0.3766376659036202,
+    "df": 66.0
+  }
+}

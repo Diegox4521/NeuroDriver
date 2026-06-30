@@ -1,0 +1,35 @@
+=== NeuroDriver paper numbers (reproduced) ===
+
+== COHORT ==
+  Sessions analyzed:        n = 69
+  Post-survey responses:    n = 77
+  Matched pre/post pairs:   n = 77
+
+== PRE/POST KNOWLEDGE GAIN (matched item Q3.4 -> Q2.2) ==
+  Pre  correct: 67.6%
+  Post correct: 82.4%
+  Gain        : 14.9 pp
+  McNemar chi^2 = 5.882, p = 0.0153
+
+== SENSOR CONFIDENCE DROPS ==
+  LiDAR       : mean 25.6 +/- 4.6 pp
+  Camera      : mean 14.4 +/- 4.5 pp
+  Speedometer : mean 13.2 +/- 8.8 pp
+
+== LIDAR DOMINANCE ==
+  Students for whom LiDAR removal was largest drop: 61/69 = 88.4%
+
+== RANKING SHIFT ==
+  Changed pre -> post ranking: 49/69 = 71.0%
+
+== DEMO CRASHES -> AI CRASHES ==
+  Pearson r = 0.453, p = 0.0001, n = 69
+
+== COMPOSITE KNOWLEDGE SCORE (post-survey, partial-credit multi-select) ==
+  Mean = 65.3% (sd 23.6)
+
+== TRIANGULATION ==
+  Themes total : 8
+  Strong       : 7
+  Moderate     : 0
+  Weak         : 1
